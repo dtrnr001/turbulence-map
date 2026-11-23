@@ -34,7 +34,8 @@ for lat in range(14, 74, STEP):
         for s in rows:
             if not s.get("icaoId") or not s.get("site") or "METAR" not in (s.get("siteType") or []):
                 continue
-            places[s["icaoId"]] = [round(s["lat"], 3), round(s["lon"], 3), s["site"].strip(), s.get("state") or "", s.get("priority") or 9]
+            # [lat, lon, name, state, priority, iata]
+            places[s["icaoId"]] = [round(s["lat"], 3), round(s["lon"], 3), s["site"].strip(), s.get("state") or "", s.get("priority") or 9, s.get("iataId") or ""]
         time.sleep(0.7)
 
 out = Path(__file__).resolve().parent.parent / "site" / "places.json"

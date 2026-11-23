@@ -1,0 +1,13 @@
+name: Probe flight route sources
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for u in "https://api.adsbdb.com/v0/callsign/DAL1234" "https://api.adsbdb.com/v0/callsign/UAL1" "https://api.adsbdb.com/v0/callsign/DAL2263" "https://hexdb.io/api/v1/route/icao/UAL1" "https://hexdb.io/callsign-route?callsign=DAL1234"; do
+            echo "=== $u"
+            curl -s -m 20 -D h.txt -H "Origin: https://dtrnr001.github.io" -A "turbulence-map/1.0" "$u" -o b.txt -w "HTTP %{http_code}\n"
+            grep -i "access-control" h.txt || echo "(no CORS headers)"
+            head -c 900 b.txt; echo
+          done
