@@ -50,7 +50,26 @@ button:hover{border-color:var(--accent)}
 .pop td{padding:1px 8px 1px 0;vertical-align:top}
 .pop td:first-child{color:var(--muted)}
 .pop code{display:block;margin-top:6px;white-space:pre-wrap;word-break:break-word;font-size:11px;color:#c9d6df;background:#0f1418;padding:6px;border-radius:6px}
-.urgent{color:#ff6b6b;font-weight:600}
+.urgent{color:#ff6b6b;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px}
+.pop h3{display:flex;gap:7px;align-items:flex-start;font-size:15px;line-height:1.3}
+.pop .dot{flex:none;width:11px;height:11px;border-radius:50%;margin-top:4px;border:1px solid #0008}
+.pop .meta{color:var(--text);margin-bottom:6px}
+.pop .feel{margin:0 0 8px;color:#cfd9e0}
+.pop .note{margin:6px 0 0;font-size:12px;color:var(--muted)}
+.pop .muted,.muted{color:var(--muted)}
+.pop details{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+.pop summary{cursor:pointer;color:var(--accent);font-size:12px}
+.pop details table{margin-top:6px;font-size:12px}
+.btns{display:flex;gap:6px;flex:none}
+#helpBtn{width:32px;padding:5px 0;font-weight:700;border-radius:50%}
+.sheet{position:fixed;inset:0;z-index:2000;background:#000a;display:flex;align-items:center;justify-content:center;padding:16px}
+.sheet[hidden]{display:none}
+.sheet-card{position:relative;background:#182027;border:1px solid var(--line);border-radius:12px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;padding:18px 18px 10px;font-size:14px}
+.sheet-card h2{margin:0 0 6px;font-size:18px}
+.sheet-card h4{margin:14px 0 4px;font-size:14px}
+.sheet-card p,.sheet-card ul{margin:0 0 6px;color:#cfd9e0}
+.sheet-card ul{padding-left:18px}
+.sheet-card .x{position:absolute;top:10px;right:10px;width:32px;height:32px;padding:0;font-size:20px;line-height:1;border-radius:50%}
 .head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 #toggle{display:none;flex:none}
 #legend .key{display:block}
@@ -60,6 +79,9 @@ button:hover{border-color:var(--accent)}
   #ctl h1{font-size:15px}
   #ctl .sub{margin-bottom:0}
   #toggle{display:block;padding:8px 12px}
+  #helpBtn{width:38px;height:38px}
+  .sheet{align-items:flex-end;padding:0}
+  .sheet-card{border-radius:14px 14px 0 0;max-height:88vh;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
   #ctl.collapsed #body{display:none}
   #body{margin-top:8px}
   select{font-size:16px;padding:8px}
@@ -79,7 +101,8 @@ button:hover{border-color:var(--accent)}
 <div class="panel" id="ctl">
   <div class="head"><div><h1>Turbulence PIREPs</h1>
   <div class="sub" id="mini">Pilot reports from NOAA Aviation Weather Center</div></div>
-  <button id="toggle" aria-expanded="true" title="Show or hide filters">Filters</button></div>
+  <div class="btns"><button id="helpBtn" title="How to read this map" aria-label="Help">?</button>
+  <button id="toggle" aria-expanded="true" title="Show or hide filters">Filters</button></div></div>
   <div id="body">
 
   <label for="age">Time window</label>
@@ -96,6 +119,13 @@ button:hover{border-color:var(--accent)}
     <option value="1" selected>Light and above</option>
     <option value="3">Moderate and above</option>
     <option value="5">Severe and above</option>
+  </select>
+
+  <label for="acSize">Aircraft</label>
+  <select id="acSize">
+    <option value="all" selected>All aircraft</option>
+    <option value="big">Airliners and regional jets</option>
+    <option value="small">Small planes, bizjets, helicopters</option>
   </select>
 
   <label>Altitude: <span id="altLbl"></span></label>
@@ -130,6 +160,33 @@ button:hover{border-color:var(--accent)}
   <div><span class="sw" style="background:var(--lgt)"></span>Light</div>
   <div><span class="sw" style="background:var(--none)"></span>Smooth / none</div>
   <div id="counts"></div>
+</div>
+
+<div id="help" class="sheet" hidden>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <button id="helpClose" class="x" aria-label="Close">×</button>
+    <h2 id="helpTitle">How to read this map</h2>
+    <h4>What the dots are</h4>
+    <p>Each dot is a <b>pilot report</b> (a "PIREP"): a pilot telling air traffic control what the ride was like at that spot and altitude. They're real observations, not forecasts, and most are from the last hour or two. Tap a dot for details.</p>
+    <h4>What the colors mean</h4>
+    <ul>
+      <li><b style="color:var(--lgt)">Light</b>: slight bumps. You notice the seatbelt; drinks ripple.</li>
+      <li><b style="color:var(--mod)">Moderate</b>: real bumps. Drinks spill, walking is hard, and the seatbelt sign is on.</li>
+      <li><b style="color:var(--sev)">Severe</b>: hard jolts. Loose items fly around. This is rare and gets an urgent report.</li>
+      <li><b style="color:var(--extm)">Extreme</b>: violent and very rare.</li>
+    </ul>
+    <p>"In-between" colors mean the pilot reported a range, like light to moderate.</p>
+    <h4>Chop vs. turbulence</h4>
+    <p><b>Chop</b> is quick, rhythmic bumpiness without much change in altitude, like a boat on small waves. <b>Turbulence</b> means the plane is actually pushed up, down or sideways. <b>Clear-air turbulence</b> happens away from clouds, often near the jet stream.</p>
+    <h4>Occasional, intermittent, continuous</h4>
+    <p>How often it happened: <b>occasional</b> is less than a third of the time, <b>intermittent</b> is a third to two thirds, and <b>continuous</b> is most of the time.</p>
+    <h4>The aircraft matters</h4>
+    <p>The same air feels much rougher in a small plane than in an airliner. Each report says what kind of aircraft reported it, and you can filter by aircraft size.</p>
+    <h4>Overlays</h4>
+    <p><b>G-AIRMETs</b> (dashed shapes) are forecasts for the US of where moderate turbulence, icing, low clouds and strong winds are expected. <b>SIGMETs</b> (solid shapes) are warnings of more serious hazards: severe turbulence, thunderstorms, icing, volcanic ash. The international ones cover oceans and other countries.</p>
+    <h4>Where the data comes from</h4>
+    <p>NOAA's Aviation Weather Center. The map refreshes every few minutes and shows how old its data is. It's for curiosity and context, not flight planning.</p>
+  </div>
 </div>
 
 <script>
@@ -202,6 +259,111 @@ function ago(d){
 }
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
+// ---------- plain-English helpers ----------
+const feet = fl => fl == null ? "unknown altitude" : (fl === 0 ? "the surface" : `${(fl*100).toLocaleString()} ft`);
+
+// Aircraft type designators -> [name, size class]
+const AC_CLASS = {S:"small plane", T:"turboprop", B:"business jet", R:"regional jet", A:"airliner", W:"wide-body airliner", H:"helicopter", M:"military aircraft"};
+const AIRCRAFT = (() => {
+  const t = {}, add = (cls, list) => list.split(";").forEach(e => { const [k,n] = e.split("="); t[k.trim()] = [n.trim(), cls]; });
+  add("A","A318=Airbus A318;A319=Airbus A319;A320=Airbus A320;A321=Airbus A321;A19N=Airbus A319neo;A20N=Airbus A320neo;A21N=Airbus A321neo;BCS1=Airbus A220-100;BCS3=Airbus A220-300;B712=Boeing 717;B733=Boeing 737-300;B734=Boeing 737-400;B735=Boeing 737-500;B736=Boeing 737-600;B737=Boeing 737-700;B738=Boeing 737-800;B739=Boeing 737-900;B37M=Boeing 737 MAX 7;B38M=Boeing 737 MAX 8;B39M=Boeing 737 MAX 9;B3XM=Boeing 737 MAX 10;B752=Boeing 757-200;B753=Boeing 757-300;MD82=McDonnell Douglas MD-82;MD83=McDonnell Douglas MD-83;MD88=McDonnell Douglas MD-88;MD90=McDonnell Douglas MD-90;E190=Embraer E190;E195=Embraer E195;E290=Embraer E190-E2;E295=Embraer E195-E2");
+  add("W","A332=Airbus A330-200;A333=Airbus A330-300;A338=Airbus A330-800neo;A339=Airbus A330-900neo;A343=Airbus A340-300;A346=Airbus A340-600;A359=Airbus A350-900;A35K=Airbus A350-1000;A388=Airbus A380;B744=Boeing 747-400;B748=Boeing 747-8;B762=Boeing 767-200;B763=Boeing 767-300;B764=Boeing 767-400;B772=Boeing 777-200;B77L=Boeing 777-200LR;B773=Boeing 777-300;B77W=Boeing 777-300ER;B778=Boeing 777-8;B779=Boeing 777-9;B788=Boeing 787-8;B789=Boeing 787-9;B78X=Boeing 787-10;MD11=McDonnell Douglas MD-11;DC10=McDonnell Douglas DC-10");
+  add("R","CRJ2=Bombardier CRJ200;CRJ7=Bombardier CRJ700;CRJ9=Bombardier CRJ900;CRJX=Bombardier CRJ1000;E135=Embraer ERJ-135;E145=Embraer ERJ-145;E45X=Embraer ERJ-145XR;E170=Embraer E170;E75L=Embraer E175;E75S=Embraer E175");
+  add("T","AT43=ATR 42-300;AT45=ATR 42-500;AT72=ATR 72;AT75=ATR 72-500;AT76=ATR 72-600;DH8A=Dash 8-100;DH8B=Dash 8-200;DH8C=Dash 8-300;DH8D=Dash 8 Q400;SF34=Saab 340;E120=Embraer Brasilia;B190=Beechcraft 1900;C208=Cessna Caravan;PC12=Pilatus PC-12;BE20=Beechcraft King Air 200;BE9L=Beechcraft King Air 90;B350=Beechcraft King Air 350;TBM7=Daher TBM 700;TBM8=Daher TBM 850;TBM9=Daher TBM 900;DHC6=de Havilland Twin Otter;SW4=Fairchild Metroliner;P46T=Piper Malibu Meridian");
+  add("B","C25A=Cessna Citation CJ2;C25B=Cessna Citation CJ3;C25C=Cessna Citation CJ4;C525=Cessna CitationJet;C510=Cessna Citation Mustang;C560=Cessna Citation V;C56X=Cessna Citation Excel;C680=Cessna Citation Sovereign;C68A=Cessna Citation Latitude;C700=Cessna Citation Longitude;C750=Cessna Citation X;E50P=Embraer Phenom 100;E55P=Embraer Phenom 300;E545=Embraer Praetor 500;E550=Embraer Praetor 600;GLF4=Gulfstream IV;GLF5=Gulfstream V;GLF6=Gulfstream G650;G280=Gulfstream G280;GL5T=Bombardier Global 5000;GLEX=Bombardier Global Express;GL7T=Bombardier Global 7500;CL30=Bombardier Challenger 300;CL35=Bombardier Challenger 350;CL60=Bombardier Challenger 600;LJ35=Learjet 35;LJ45=Learjet 45;LJ60=Learjet 60;LJ75=Learjet 75;F2TH=Dassault Falcon 2000;F900=Dassault Falcon 900;FA7X=Dassault Falcon 7X;FA8X=Dassault Falcon 8X;H25B=Hawker 800;BE40=Beechjet 400;PC24=Pilatus PC-24;HDJT=HondaJet;SF50=Cirrus Vision Jet");
+  add("S","C150=Cessna 150;C152=Cessna 152;C172=Cessna 172;C182=Cessna 182;C206=Cessna 206;C210=Cessna 210;C340=Cessna 340;C414=Cessna 414;C421=Cessna 421;P28A=Piper Cherokee;P28R=Piper Arrow;P32R=Piper Saratoga;PA34=Piper Seneca;PA44=Piper Seminole;PA46=Piper Malibu;SR20=Cirrus SR20;SR22=Cirrus SR22;S22T=Cirrus SR22T;BE35=Beechcraft Bonanza;BE36=Beechcraft Bonanza;BE58=Beechcraft Baron;DA40=Diamond DA40;DA42=Diamond DA42;DA62=Diamond DA62;M20P=Mooney M20;M20T=Mooney M20 Turbo");
+  add("H","EC30=Airbus H130;EC35=Airbus H135;EC45=Airbus H145;AS50=Airbus AS350;B06=Bell 206;B407=Bell 407;B412=Bell 412;S76=Sikorsky S-76;A109=Leonardo AW109;R44=Robinson R44;R22=Robinson R22");
+  add("M","C130=Lockheed C-130 Hercules;C30J=Lockheed C-130J;C17=Boeing C-17;K35R=Boeing KC-135;C5M=Lockheed C-5;B52=Boeing B-52;T38=Northrop T-38;F16=F-16");
+  return t;
+})();
+function aircraftOf(code){
+  const c = String(code||"").trim().toUpperCase();
+  if(!c || c === "UNKN") return {name:"Unknown aircraft", cls:null, code:c};
+  const hit = AIRCRAFT[c];
+  return hit ? {name: hit[0], cls: hit[1], code: c} : {name: c, cls: null, code: c};
+}
+const isBig = cls => cls === "A" || cls === "W" || cls === "R";
+
+// What each intensity feels like inside the cabin (paraphrasing the FAA's turbulence reporting criteria).
+const FEEL = [
+  "Smooth ride. No turbulence reported.",
+  "Slight bumps. You may feel the seatbelt; drinks ripple but walking is easy.",
+  "Light to moderate bumps. Expect some jostling and the seatbelt sign may come on.",
+  "Noticeable strain against the seatbelt. Loose objects move, drinks spill and walking is difficult.",
+  "Moderate to severe. Hard jolts; flight attendants would be seated.",
+  "Forced hard against the seatbelt. Loose objects are thrown around and walking is impossible.",
+  "Violent. The aircraft is tossed about and hard to control.",
+];
+
+// Decode a PIREP /TB group, e.g. "CONS LGT CHOP OCNL MOD" -> "Continuous light chop, occasional moderate"
+const TB_WORDS = {
+  CONS:"continuous", CONT:"continuous", OCNL:"occasional", INTMT:"intermittent", INTMTNT:"intermittent", INTMNT:"intermittent", INTM:"intermittent", FRQ:"frequent", ISOL:"isolated",
+  NEG:"no turbulence", SMTH:"smooth", SMOOTH:"smooth", LGT:"light", LT:"light", MOD:"moderate", SEV:"severe", EXTM:"extreme", EXTRM:"extreme",
+  CHOP:"chop", CAT:"clear-air turbulence", TURB:"turbulence", MWAVE:"mountain wave", MTW:"mountain wave", LLWS:"low-level wind shear",
+  BLO:"below", BLW:"below", ABV:"above", DURC:"while climbing", DURD:"while descending", IN:"in", CLR:"in clear air", CLDS:"in clouds", TO:"to", AND:"and", OR:"or",
+};
+const FREQ = new Set(["continuous","occasional","intermittent","frequent","isolated"]);
+const INTS = new Set(["light","moderate","severe","extreme","smooth","no turbulence"]);
+const NOUNS = new Set(["chop","clear-air turbulence","turbulence","mountain wave","low-level wind shear","no turbulence"]);
+function decodeTB(raw){
+  const m = String(raw||"").match(/\/TB\s+([^/]+)/);
+  if(!m) return null;
+  const out = [];
+  for(const tok of m[1].trim().split(/\s+/)){
+    if(/^\d{3}-\d{3}$/.test(tok)){ const [a,b] = tok.split("-").map(Number); out.push(`between ${feet(a)} and ${feet(b)}`); continue; }
+    if(/^\d{3}$/.test(tok)){ out.push(feet(+tok)); continue; }
+    if(tok.includes("-")){
+      const parts = tok.split("-").map(w => TB_WORDS[w]);
+      if(parts.every(Boolean)){ out.push(parts.join(" to ")); continue; }
+    }
+    const w = TB_WORDS[tok];
+    out.push(w || tok.toLowerCase());
+  }
+  // no type word given: add "turbulence" right after the first intensity ("moderate turbulence between ...")
+  const isInt = w => [...INTS].some(x => w.includes(x)) && !/smooth|no turbulence/.test(w);
+  if(!out.some(w => NOUNS.has(w))){
+    const i = out.findIndex(isInt);
+    if(i >= 0){ let j = i; while(j+1 < out.length && isInt(out[j+1])) j++; out.splice(j+1, 0, "turbulence"); }
+  }
+  // put a comma before a second frequency word ("continuous light chop, occasional moderate")
+  let s = "";
+  out.forEach((w,i) => { s += (i===0 ? "" : (FREQ.has(w) ? ", " : " ")) + w; });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Local time, plus the weekday if it isn't today
+function localTime(d){
+  if(!d) return "unknown time";
+  const t = d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+  return d.toDateString() === new Date().toDateString() ? t : `${d.toLocaleDateString([], {weekday:"short"})} ${t}`;
+}
+
+// Nearest named airport, from places.json (built from AWC's station list)
+let PLACES = null;
+fetch("places.json").then(r => r.ok ? r.json() : null).then(d => { if(d) PLACES = Object.values(d); }).catch(() => {});
+const DIRS = ["N","NE","E","SE","S","SW","W","NW"];
+function placeOf(lat, lon){
+  if(!PLACES) return null;
+  const rad = Math.PI/180;
+  let best = null, bestScore = Infinity;
+  for(const [plat, plon, name, st, pri] of PLACES){
+    const dLat = (lat-plat)*rad, dLon = (lon-plon)*rad*Math.cos(lat*rad);
+    const mi = Math.sqrt(dLat*dLat + dLon*dLon) * 3959;
+    // prefer better-known airports a little (AWC's priority field doesn't track size)
+    const score = mi * (/\bIntl\b|International/i.test(name) ? 0.6 : /Rgnl|Regional|Muni|Municipal|County|Cnty/i.test(name) ? 0.85 : 1);
+    if(score < bestScore){ bestScore = score; best = {mi, plat, plon, name, st}; }
+  }
+  if(!best || best.mi > 400) return null;
+  const label = `${best.name}${best.st ? ", " + best.st : ""}`;
+  if(best.mi < 8) return `over ${label}`;
+  const y = Math.sin((lon-best.plon)*rad)*Math.cos(lat*rad);
+  const x = Math.cos(best.plat*rad)*Math.sin(lat*rad) - Math.sin(best.plat*rad)*Math.cos(lat*rad)*Math.cos((lon-best.plon)*rad);
+  const brg = (Math.atan2(y, x)/rad + 360) % 360;
+  return `${Math.round(best.mi/5)*5 || 5} mi ${DIRS[Math.round(brg/45)%8]} of ${label}`;
+}
+const cToF = c => Math.round(c*9/5+32);
+
+
 // ---------- map ----------
 const map = L.map("map", {zoomControl:false, worldCopyJump:true}).setView([39, -97], matchMedia("(max-width:600px)").matches ? 3 : 4);
 L.control.zoom({position:"topright"}).addTo(map);
@@ -219,7 +381,7 @@ const $ = id => document.getElementById(id);
 function altLabel(){
   let a = +$("altMin").value, b = +$("altMax").value;
   if(a > b) [a,b] = [b,a];
-  $("altLbl").textContent = `${a===0?"Surface":"FL"+String(a).padStart(3,"0")} to ${b>=450?"FL450+":"FL"+String(b).padStart(3,"0")}`;
+  $("altLbl").textContent = `${a===0?"Surface":feet(a)} to ${b>=450?"45,000+ ft":feet(b)}`;
   return [a,b];
 }
 
@@ -233,6 +395,7 @@ function render(){
   const list = reports
     .filter(r => r.rank >= minInt)
     .filter(r => r.fl == null ? (a===0 && b>=450) : (r.fl >= a && (b>=450 || r.fl <= b)))
+    .filter(r => { const sz = $("acSize").value; if(sz === "all") return true; const c = aircraftOf(r.p.acType).cls; return sz === "big" ? isBig(c) : (c && !isBig(c)); })
     .sort((x,y) => x.rank - y.rank);
   for(const r of list){
     counts[r.rank]++; shown++;
@@ -241,7 +404,7 @@ function render(){
       fillColor: color(r.rank), fillOpacity: .9, opacity: .8
     });
     m.bindPopup(() => popup(r), {maxWidth: 320});
-    m.bindTooltip(`${LEVELS[r.rank].label} · ${fmtFL(r.fl)}`, {direction:"top", offset:[0,-4]});
+    m.bindTooltip(`${LEVELS[r.rank].label} · ${feet(r.fl)}`, {direction:"top", offset:[0,-4]});
     layer.addLayer(m);
   }
   $("counts").innerHTML = `${shown} shown of ${reports.length} turbulence reports`;
@@ -250,21 +413,38 @@ function render(){
 
 function popup(r){
   const p = r.p, L1 = r.layer || {};
-  const rows = [
-    ["Intensity", `<b style="color:${color(r.rank)}">${LEVELS[r.rank].label}</b>${L1.int?` (${esc(L1.int)})`:""}`],
-    ["Altitude", esc(fmtFL(r.fl)) + ({DURD:" · during descent", DURC:" · during climb"}[p.fltLvlType] || "")],
+  const ac = aircraftOf(p.acType);
+  const what = decodeTB(p.rawOb) || (r.rank === 0 ? "No turbulence" : `${LEVELS[r.rank].label} turbulence`);
+  const phase = /while (climbing|descending)/.test(what) ? "" : ({DURD:" while descending", DURC:" while climbing"}[p.fltLvlType] || "");
+  const where = placeOf(r.lat, r.lon);
+  const acLine = ac.cls ? `${esc(ac.name)} <span class="muted">(${AC_CLASS[ac.cls]})</span>` : esc(ac.name);
+  const small = ac.cls && !isBig(ac.cls) && ac.cls !== "M";
+  // pilot details: everything decoded, plus the codes most people don't need
+  const rm = (String(p.rawOb||"").match(/\/RM\s+([^/]+(?:\/[^/]+)*)$/) || [])[1];
+  const det = [
+    ["Report type", r.urgent ? "Urgent PIREP (UUA)" : "Routine PIREP (UA)"],
+    ["Flight level", esc(fmtFL(r.fl))],
     (L1.bas||L1.top) ? ["Turb layer", `${L1.bas?("FL"+esc(L1.bas)):"?"} – ${L1.top?("FL"+esc(L1.top)):"?"}`] : null,
-    L1.type ? ["Type", esc(L1.type)] : null,
-    L1.freq ? ["Frequency", esc(L1.freq)] : null,
-    ["Time", r.t ? `${r.t.toUTCString().slice(17,22)}Z · ${ago(r.t)}` : "unknown"],
-    p.acType ? ["Aircraft", esc(p.acType)] : null,
-    p.icaoId ? ["Near", esc(p.icaoId)] : null,
-    (p.temp!=null && p.temp!=="") ? ["Temp", esc(p.temp)+"°C"] : null,
-    (p.wdir!=null && p.wspd!=null && p.wdir!=="") ? ["Wind", `${esc(p.wdir)}° / ${esc(p.wspd)} kt`] : null,
+    ["Time (UTC)", r.t ? fmtUTC(r.t) : "?"],
+    ["Aircraft code", esc(ac.code || "?")],
+    (p.temp!=null && p.temp!=="") ? ["Temperature", `${esc(p.temp)}°C (${cToF(+p.temp)}°F)`] : null,
+    (p.wdir!=null && p.wspd!=null && p.wdir!=="") ? ["Wind", `${esc(p.wdir)}° at ${esc(p.wspd)} kt`] : null,
+    rm ? ["Remarks", esc(rm)] : null,
   ].filter(Boolean);
-  return `<div class="pop"><h3>${r.urgent?'<span class="urgent">URGENT </span>':""}${esc(p.pirepType||"PIREP")}</h3>
-    <table>${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>
-    ${p.rawOb?`<code>${esc(p.rawOb)}</code>`:""}</div>`;
+  return `<div class="pop">
+    ${r.urgent?'<div class="urgent">Urgent report</div>':""}
+    <h3><span class="dot" style="background:${color(r.rank)}"></span>${esc(what)}</h3>
+    <div class="meta">at <b>${esc(feet(r.fl))}</b>${phase} · ${esc(localTime(r.t))}${r.t?` <span class="muted">(${ago(r.t)})</span>`:""}</div>
+    <p class="feel">${/occasional|intermittent|isolated|,/.test(what) && r.rank > 0 ? "At its worst: " : ""}${esc(FEEL[r.rank])}</p>
+    <table>
+      <tr><td>Aircraft</td><td>${acLine}</td></tr>
+      ${where?`<tr><td>Where</td><td>${esc(where)}</td></tr>`:""}
+    </table>
+    ${small?`<p class="note">Reported by a smaller aircraft. Airliners usually feel the same air as gentler.</p>`:""}
+    <details><summary>Pilot details and original report</summary>
+      <table>${det.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>
+      ${p.rawOb?`<code>${esc(p.rawOb)}</code>`:""}
+    </details></div>`;
 }
 
 function status(){
@@ -361,7 +541,7 @@ const ISIGMET_STYLE = {
 };
 const OTHER = {c:"#9aa5ad", label:"Other"};
 
-const fmtUTC = d => d ? `${String(d.getUTCHours()).padStart(2,"0")}${String(d.getUTCMinutes()).padStart(2,"0")}Z` : "?";
+function fmtUTC(d){ return d ? `${String(d.getUTCHours()).padStart(2,"0")}${String(d.getUTCMinutes()).padStart(2,"0")}Z` : "?"; }
 const toDate = v => { if(v==null) return null; const d = typeof v==="number" ? new Date(v<1e12?v*1000:v) : new Date(v); return isNaN(d)?null:d; };
 const lvl = v => {
   if(v==null || v==="") return null;
@@ -374,33 +554,62 @@ const overlays = {
   isigmet: {group: L.layerGroup(), file: "isigmet.json", box: "ovIsigmet", info: "infoIsigmet", key: "keyIsigmet", data: null},
 };
 
+// Altitude words for overlays: "FL280" -> "28,000 ft", "SFC" -> "the surface", "FZL" -> "the freezing level"
+function altWords(v){
+  if(v==null || v==="") return null;
+  const s = String(v).toUpperCase();
+  if(/^\d+$/.test(s)){ const n = +s; return n === 0 ? "the surface" : (n >= 1000 ? `${n.toLocaleString()} ft` : feet(n)); }
+  return {SFC:"the surface", FZL:"the freezing level"}[s] || s;
+}
+const between = (b,t) => (b||t) ? `from ${altWords(b)||"?"} up to ${altWords(t)||"?"}` : "";
+const SEV_WORD = {LGT:"light", MOD:"moderate", SEV:"severe", EXTM:"extreme"};
+const GAIRMET_WHAT = {
+  "TURB-HI": "turbulence at high altitude", "TURB-LO": "turbulence at low altitude",
+  "LLWS": "low-level wind shear (sudden wind changes near the ground)", "SFC_WND": "strong surface winds (over 30 kt)",
+  "ICE": "icing", "IFR": "low clouds and poor visibility", "MT_OBSC": "mountains hidden in cloud",
+};
+const SIGMET_WHAT = {TURB:"turbulence", MTW:"mountain-wave turbulence", TS:"thunderstorms", ICE:"icing", VA:"volcanic ash", TC:"tropical cyclone"};
+const QUAL = {SEV:"severe", EMBD:"embedded", FRQ:"frequent", OCNL:"occasional", ISOL:"isolated", OBSC:"obscured", SQL:"a squall line of"};
+const COMPASS = {N:"north",NE:"northeast",E:"east",SE:"southeast",S:"south",SW:"southwest",W:"west",NW:"northwest",NNE:"north-northeast",ENE:"east-northeast",ESE:"east-southeast",SSE:"south-southeast",SSW:"south-southwest",WSW:"west-southwest",WNW:"west-northwest",NNW:"north-northwest"};
+const tbl = rows => `<table>${rows.filter(Boolean).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>`;
+
 function gairmetPopup(p){
   const st = GAIRMET_STYLE[p.hazard] || OTHER;
-  const rows = [
-    ["Product", esc(p.product||"") + (p.tag?` · tag ${esc(p.tag)}`:"")],
-    p.severity ? ["Severity", esc(p.severity)] : null,
-    (p.base||p.top) ? ["Altitude", `${esc(lvl(p.base)||"?")} to ${esc(lvl(p.top)||"?")}`] : null,
-    p.dueTo ? ["Due to", esc(p.dueTo)] : null,
-    ["Valid", `${fmtUTC(toDate(p.validTime))} (forecast +${esc(p.forecast ?? "?")} h)`],
-    p.issueTime ? ["Issued", fmtUTC(toDate(p.issueTime))] : null,
-  ].filter(Boolean);
-  return `<div class="pop"><h3 style="color:${st.c}">G-AIRMET: ${esc(st.label)}</h3>
-    <table>${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table></div>`;
+  const sev = SEV_WORD[p.severity] || (/^TURB/.test(p.hazard) ? "moderate" : "");
+  const what = GAIRMET_WHAT[p.hazard] || String(p.hazard||"").toLowerCase();
+  const head = `Forecast: ${sev ? sev + " " : ""}${what}`;
+  const alt = between(p.base, p.top);
+  const vt = toDate(p.validTime);
+  return `<div class="pop"><div class="urgent" style="color:${st.c}">G-AIRMET forecast</div>
+    <h3>${esc(head.charAt(0).toUpperCase()+head.slice(1))}</h3>
+    <div class="meta">${alt?esc(alt)+" · ":""}around ${esc(localTime(vt))}</div>
+    ${p.dueTo && p.hazard!=="ICE" ? `<p class="feel">Cause: ${esc(String(p.dueTo).toLowerCase())}</p>` : ""}
+    <details><summary>Pilot details</summary>
+      ${tbl([["Product", esc(p.product||"")], ["Hazard", esc(p.hazard||"")], p.tag?["Tag", esc(p.tag)]:null,
+        p.severity?["Severity", esc(p.severity)]:null, (p.base||p.top)?["Base / top", `${esc(p.base||"?")} / ${esc(p.top||"?")}`]:null,
+        p.dueTo?["Due to", esc(p.dueTo)]:null,
+        ["Valid", `${fmtUTC(vt)} (+${esc(p.forecast ?? "?")} h forecast)`], p.issueTime?["Issued", fmtUTC(toDate(p.issueTime))]:null])}
+    </details></div>`;
 }
 function isigmetPopup(p){
   const st = ISIGMET_STYLE[p.hazard] || OTHER;
   const fcst = /F$/.test(p.seriesId||"");
-  const rows = [
-    ["Region", esc(p.firName || p.firId || "")],
-    p.qualifier ? ["Qualifier", esc(p.qualifier)] : null,
-    (p.base!=null||p.top!=null) ? ["Altitude", `${esc(lvl(p.base)||"?")} to ${esc(lvl(p.top)||"?")}`] : null,
-    ["Valid", `${fmtUTC(toDate(p.validTimeFrom))} – ${fmtUTC(toDate(p.validTimeTo))}`],
-    (p.dir||p.spd) ? ["Moving", `${esc(p.dir||"")} ${p.spd?esc(p.spd)+" kt":""}`] : null,
-    fcst ? ["Note", "Forecast position (dashed)"] : null,
-  ].filter(Boolean);
-  return `<div class="pop"><h3 style="color:${st.c}">SIGMET: ${esc(st.label)}</h3>
-    <table>${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>
-    ${p.rawSigmet?`<code>${esc(p.rawSigmet)}</code>`:""}</div>`;
+  const q = QUAL[p.qualifier] ? QUAL[p.qualifier] + " " : "";
+  const what = SIGMET_WHAT[p.hazard] || String(p.hazard||"").toLowerCase();
+  const extra = p.hazard === "VA" && p.qualifier && !QUAL[p.qualifier] ? ` (${String(p.qualifier).toLowerCase()})` : "";
+  const alt = between(p.base, p.top);
+  const to = toDate(p.validTimeTo);
+  const dir = COMPASS[String(p.dir||"").toUpperCase()];
+  const moving = dir ? `Moving ${dir}${p.spd ? ` at ${esc(p.spd)} kt` : ""}.` : (/STNR/.test(p.rawSigmet||"") ? "Stationary." : "");
+  return `<div class="pop"><div class="urgent" style="color:${st.c}">SIGMET warning${fcst?" · forecast position":""}</div>
+    <h3>${esc((q + what).charAt(0).toUpperCase() + (q + what).slice(1))}${esc(extra)}</h3>
+    <div class="meta">${alt?esc(alt)+" · ":""}until ${esc(localTime(to))}</div>
+    <p class="feel">${esc(p.firName ? "Over " + String(p.firName).replace(/^[A-Z]{4}\s+/,"").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()) + ". " : "")}${moving}${fcst?" This dashed shape is where it's expected to be by the end of the warning.":""}</p>
+    <details><summary>Pilot details and original text</summary>
+      ${tbl([["Region", esc(p.firName || p.firId || "")], ["Hazard", esc(p.hazard||"")], p.qualifier?["Qualifier", esc(p.qualifier)]:null,
+        ["Valid (UTC)", `${fmtUTC(toDate(p.validTimeFrom))} – ${fmtUTC(to)}`]])}
+      ${p.rawSigmet?`<code>${esc(p.rawSigmet)}</code>`:""}
+    </details></div>`;
 }
 
 function drawOverlay(name){
@@ -466,10 +675,18 @@ function schedule(){
 
 $("age").onchange = load;
 $("minInt").onchange = render;
+$("acSize").onchange = render;
 $("altMin").oninput = $("altMax").oninput = render;
 $("refresh").onclick = () => { load(); loadOverlays(); schedule(); };
 $("auto").onchange = schedule;
 setInterval(status, 30000);
+const openHelp = () => { $("help").hidden = false; };
+const closeHelp = () => { $("help").hidden = true; };
+$("helpBtn").onclick = openHelp;
+$("helpClose").onclick = closeHelp;
+$("help").onclick = e => { if(e.target.id === "help") closeHelp(); };
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeHelp(); });
+try{ if(!localStorage.getItem("seenHelp")){ localStorage.setItem("seenHelp","1"); openHelp(); } }catch(e){}
 $("toggle").onclick = () => {
   const c = $("ctl").classList.toggle("collapsed");
   $("toggle").setAttribute("aria-expanded", String(!c));
