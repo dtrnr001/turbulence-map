@@ -224,9 +224,9 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
     <h4>Overlays</h4>
     <p><b>G-AIRMETs</b> (dashed shapes) are forecasts for the US of where moderate turbulence, icing, low clouds and strong winds are expected. <b>SIGMETs</b> (solid shapes) are warnings of more serious hazards: severe turbulence, thunderstorms, icing, volcanic ash. The international ones cover oceans and other countries.</p>
     <h4>Radar and winds aloft</h4>
-    <p>The checkboxes on the map itself add <b>radar</b> (rain and storms from NWS weather radar, updated every 5 minutes) and <b>winds aloft</b> (forecast jet-stream winds around 34,000 ft, where airliners cruise). Turbulence is more common near storms and along the edges of a strong jet stream, so these help explain the reports.</p>
+    <p>The checkboxes on the map itself add <b>radar</b> (rain and storms from NOAA's quality-controlled radar mosaic, which filters out birds, bugs and ground clutter; refreshed every 5 minutes) and <b>winds aloft</b> (forecast jet-stream winds around 34,000 ft, where airliners cruise). Turbulence is more common near storms and along the edges of a strong jet stream, so these help explain the reports.</p>
     <h4>Where the data comes from</h4>
-    <p>NOAA's Aviation Weather Center; radar from the National Weather Service via the Iowa Environmental Mesonet; winds from the GFS model via <a href="https://open-meteo.com/" style="color:var(--accent)">Open-Meteo</a> (CC BY 4.0). The map refreshes every few minutes and shows how old its data is. It's for curiosity and context, not flight planning.</p>
+    <p>NOAA's Aviation Weather Center; radar from NOAA's MRMS mosaic; winds from the GFS model via <a href="https://open-meteo.com/" style="color:var(--accent)">Open-Meteo</a> (CC BY 4.0). The map refreshes every few minutes and shows how old its data is. It's for curiosity and context, not flight planning.</p>
   </div>
 </div>
 
@@ -946,10 +946,14 @@ $("corridor").onchange = () => { if(route){ render(); Object.keys(overlays).forE
 
 // ---------- quick toggles on the map: radar and jet-stream winds ----------
 map.createPane("radar").style.zIndex = 320;
-const radarLayer = L.tileLayer("https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png?_={t}", {
-  pane: "radar", opacity: .65, maxZoom: 10, t: () => Math.floor(Date.now() / 300000),
-  attribution: 'Radar: NWS NEXRAD via <a href="https://mesonet.agron.iastate.edu/">Iowa Env. Mesonet</a>'
+// NOAA MRMS quality-controlled reflectivity: birds, bugs and ground clutter near radar sites are already filtered out
+const radarStamp = () => Math.floor(Date.now() / 120000);
+const radarLayer = L.tileLayer.wms("https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows", {
+  layers: "conus_bref_qcd", format: "image/png", transparent: true, _: radarStamp(),
+  pane: "radar", opacity: .75, maxZoom: 12,
+  attribution: 'Radar: NOAA MRMS via <a href="https://opengeo.ncep.noaa.gov/">NWS</a>'
 });
+function refreshRadar(){ radarLayer.setParams({ _: radarStamp() }); }
 map.createPane("winds").style.zIndex = 360;
 map.getPane("winds").style.pointerEvents = "none";
 let windData = null;
@@ -1160,7 +1164,7 @@ const QuickToggles = L.Control.extend({
 map.addControl(new QuickToggles());
 function setRadar(){
   const on = $("qtRadar").checked;
-  if(on){ radarLayer.redraw(); radarLayer.addTo(map); } else map.removeLayer(radarLayer);
+  if(on){ refreshRadar(); radarLayer.addTo(map); } else map.removeLayer(radarLayer);
   try{ localStorage.setItem("qt_radar", on ? "1" : "0"); }catch(e){}
 }
 function setWinds(){
@@ -1175,7 +1179,7 @@ $("qtRadar").onchange = setRadar;
 $("qtWinds").onchange = setWinds;
 setRadar(); setWinds();
 // radar tiles change every 5 minutes; winds every few hours
-setInterval(() => { if($("qtRadar").checked) radarLayer.redraw(); if($("qtWinds").checked) loadWinds(); }, 5 * 60 * 1000);
+setInterval(() => { if($("qtRadar").checked) refreshRadar(); if($("qtWinds").checked) loadWinds(); }, 5 * 60 * 1000);
 
 function schedule(){
   clearInterval(timer); timer = null;
