@@ -2,7 +2,9 @@ name: Update PIREPs and deploy map
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # GitHub may delay scheduled runs by several minutes
+    # GitHub only honours this about once an hour; the "next" job below keeps a
+    # 10-minute chain going, and this schedule restarts the chain if it ever stops.
+    - cron: "*/10 * * * *"
   push:
     branches: [main]
   workflow_dispatch:
@@ -11,6 +13,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write
 
 concurrency:
   group: pages
@@ -43,3 +46,28 @@ jobs:
       - id: deployment
         if: steps.deploy1.outcome == 'failure'
         uses: actions/deploy-pages@v4
+
+  # Start the next update about 10 minutes after this one started.
+  # Skipped if another update is already queued or running, so chains never pile up.
+  next:
+    needs: deploy
+    if: always() && github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Wait until 10 minutes after this run started
+        run: |
+          started=$(gh api repos/$REPO/actions/runs/${{ github.run_id }} --jq .run_started_at)
+          wait=$(( 600 - ( $(date +%s) - $(date -d "$started" +%s) ) ))
+          echo "sleeping ${wait}s"
+          if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
+      - name: Queue the next update
+        run: |
+          others=$(gh api "repos/$REPO/actions/workflows/update.yml/runs?per_page=20" \
+            --jq '[.workflow_runs[] | select(.id != ${{ github.run_id }}) | select(.status=="queued" or .status=="in_progress" or .status=="waiting" or .status=="pending")] | length')
+          if [ "$others" -gt 0 ]; then echo "another update is already queued or running; not chaining"; exit 0; fi
+          gh workflow run update.yml --repo "$REPO" --ref main
+
