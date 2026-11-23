@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Fetch recent turbulence PIREPs from NOAA AWC and write site/pirep.json.
+"""Fetch recent turbulence PIREPs, G-AIRMETs and International SIGMETs from
+NOAA AWC and write site/pirep.json, site/gairmet.json and site/isigmet.json.
 
 Run by the GitHub Actions workflow every few minutes. AWC returns at most
 400 reports per request, so the US area is split into boxes and merged.
@@ -42,6 +43,38 @@ def get(box):
     raise RuntimeError(f"failed to fetch box {box}")
 
 
+def get_geojson(product):
+    """Fetch a GeoJSON product (gairmet, isigmet). Returns None on failure."""
+    req = urllib.request.Request(f"https://aviationweather.gov/api/data/{product}?format=geojson",
+                                 headers={"User-Agent": UA})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=40) as r:
+                body = r.read()
+                return json.loads(body) if body.strip() else {"type": "FeatureCollection", "features": []}
+        except urllib.error.HTTPError as e:
+            if e.code == 204:
+                return {"type": "FeatureCollection", "features": []}
+            print(f"{product}: HTTP {e.code}", file=sys.stderr)
+        except Exception as e:
+            print(f"{product}: {e}", file=sys.stderr)
+        time.sleep(3 * (attempt + 1))
+    return None
+
+
+def write_overlays(site):
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    for product in ("gairmet", "isigmet"):
+        fc = get_geojson(product)
+        if fc is None:
+            # Still publish an empty file so the page can say the layer is unavailable.
+            fc = {"type": "FeatureCollection", "features": [], "error": "fetch failed"}
+        fc["fetchedAt"] = now
+        (site / f"{product}.json").write_text(json.dumps(fc, separators=(",", ":")))
+        print(f"wrote {len(fc.get('features', []))} {product} features")
+        time.sleep(1)
+
+
 def main(out):
     seen, reports, truncated, failures = set(), [], False, 0
     for box in BOXES:
@@ -73,6 +106,7 @@ def main(out):
     if reports:
         print("sample report:", json.dumps(reports[0])[:1500])
     print(f"wrote {len(reports)} reports to {out} (truncated={truncated}, failed boxes={failures})")
+    write_overlays(out.parent)
 
 
 if __name__ == "__main__":

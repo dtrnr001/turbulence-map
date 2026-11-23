@@ -32,6 +32,14 @@ select{background:#0f1418;color:var(--text);border:1px solid var(--line);border-
 button{background:#22303a;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
 button:hover{border-color:var(--accent)}
 #legend{bottom:22px;left:12px;font-size:12px}
+.ov{margin:4px 0 6px}
+.ov > label{margin:0;color:var(--text);font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ovinfo{color:var(--muted);font-size:11px}
+.chips{display:none;flex-wrap:wrap;gap:3px 9px;margin:3px 0 0 22px;font-size:11px;color:var(--muted)}
+.ov.on .chips{display:flex}
+.chip{display:inline-flex;align-items:center;gap:4px}
+.chip i{width:14px;height:0;border-top:2px solid;display:inline-block}
+.chip i.dash{border-top-style:dashed}
 #legend div{display:flex;align-items:center;gap:7px;margin:2px 0}
 .sw{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid #0008}
 #counts{color:var(--muted);font-size:12px;margin-top:6px}
@@ -48,7 +56,7 @@ button:hover{border-color:var(--accent)}
 #legend .key{display:block}
 #legend .keys{display:block}
 @media (max-width:600px){
-  #ctl{top:auto;bottom:calc(10px + env(safe-area-inset-bottom));left:10px;right:10px;width:auto;padding:10px 12px}
+  #ctl{top:auto;bottom:calc(10px + env(safe-area-inset-bottom));left:10px;right:10px;width:auto;padding:10px 12px;max-height:72vh;overflow-y:auto}
   #ctl h1{font-size:15px}
   #ctl .sub{margin-bottom:0}
   #toggle{display:block;padding:8px 12px}
@@ -56,7 +64,8 @@ button:hover{border-color:var(--accent)}
   #body{margin-top:8px}
   select{font-size:16px;padding:8px}
   input[type=range]{height:28px}
-  .row label{font-size:15px}
+  .row label,.ov > label{font-size:15px}
+  .ov input[type=checkbox],.row input[type=checkbox]{width:18px;height:18px}
   #refresh{padding:8px 14px}
   #legend{top:calc(10px + env(safe-area-inset-top));bottom:auto;left:10px;padding:6px 8px;font-size:11px;display:flex;flex-wrap:wrap;gap:2px 8px;max-width:calc(100vw - 70px)}
   #legend div{margin:0}
@@ -92,6 +101,16 @@ button:hover{border-color:var(--accent)}
   <label>Altitude: <span id="altLbl"></span></label>
   <div class="row"><input type="range" id="altMin" min="0" max="450" step="10" value="0"></div>
   <div class="row"><input type="range" id="altMax" min="0" max="450" step="10" value="450"></div>
+
+  <label>Overlays</label>
+  <div class="ov">
+    <label><input type="checkbox" id="ovGairmet"> G-AIRMETs <span class="ovinfo" id="infoGairmet"></span></label>
+    <div class="chips" id="keyGairmet"></div>
+  </div>
+  <div class="ov">
+    <label><input type="checkbox" id="ovIsigmet"> International SIGMETs <span class="ovinfo" id="infoIsigmet"></span></label>
+    <div class="chips" id="keyIsigmet"></div>
+  </div>
 
   <div class="row" style="margin-top:10px;justify-content:space-between">
     <label><input type="checkbox" id="auto" checked> Auto-refresh</label>
@@ -318,16 +337,137 @@ async function load(){
   }
 }
 
+// ---------- overlays: G-AIRMETs and International SIGMETs ----------
+// Drawn in their own pane under the PIREP dots so the dots stay tappable.
+map.createPane("hazards").style.zIndex = 350;
+
+const GAIRMET_STYLE = {
+  "TURB-HI": {c:"#f7c948", label:"Turbulence, high"},
+  "TURB-LO": {c:"#f08c3a", label:"Turbulence, low"},
+  "LLWS":    {c:"#ff5d8f", label:"Low-level wind shear"},
+  "SFC_WND": {c:"#ff9fc0", label:"Strong surface wind"},
+  "ICE":     {c:"#5ab0ff", label:"Icing"},
+  "IFR":     {c:"#b38cff", label:"IFR"},
+  "MT_OBSC": {c:"#c9a27a", label:"Mountain obscuration"},
+};
+const GAIRMET_SKIP = new Set(["FZLVL","M_FZLVL"]); // freezing-level contours add clutter
+const ISIGMET_STYLE = {
+  "TURB": {c:"#ff4d4d", label:"Turbulence"},
+  "MTW":  {c:"#ff8fb1", label:"Mountain wave"},
+  "TS":   {c:"#ffd23f", label:"Thunderstorms"},
+  "ICE":  {c:"#4fc3f7", label:"Icing"},
+  "VA":   {c:"#bdbdbd", label:"Volcanic ash"},
+  "TC":   {c:"#7ee081", label:"Tropical cyclone"},
+};
+const OTHER = {c:"#9aa5ad", label:"Other"};
+
+const fmtUTC = d => d ? `${String(d.getUTCHours()).padStart(2,"0")}${String(d.getUTCMinutes()).padStart(2,"0")}Z` : "?";
+const toDate = v => { if(v==null) return null; const d = typeof v==="number" ? new Date(v<1e12?v*1000:v) : new Date(v); return isNaN(d)?null:d; };
+const lvl = v => {
+  if(v==null || v==="") return null;
+  if(/^\d+$/.test(String(v))) { const n = +v; return n >= 1000 ? fmtFL(Math.round(n/100)) : (n===0 ? "surface" : fmtFL(n)); }
+  return {SFC:"surface", FZL:"freezing level"}[v] || String(v);
+};
+
+const overlays = {
+  gairmet: {group: L.layerGroup(), file: "gairmet.json", box: "ovGairmet", info: "infoGairmet", key: "keyGairmet", data: null},
+  isigmet: {group: L.layerGroup(), file: "isigmet.json", box: "ovIsigmet", info: "infoIsigmet", key: "keyIsigmet", data: null},
+};
+
+function gairmetPopup(p){
+  const st = GAIRMET_STYLE[p.hazard] || OTHER;
+  const rows = [
+    ["Product", esc(p.product||"") + (p.tag?` · tag ${esc(p.tag)}`:"")],
+    p.severity ? ["Severity", esc(p.severity)] : null,
+    (p.base||p.top) ? ["Altitude", `${esc(lvl(p.base)||"?")} to ${esc(lvl(p.top)||"?")}`] : null,
+    p.dueTo ? ["Due to", esc(p.dueTo)] : null,
+    ["Valid", `${fmtUTC(toDate(p.validTime))} (forecast +${esc(p.forecast ?? "?")} h)`],
+    p.issueTime ? ["Issued", fmtUTC(toDate(p.issueTime))] : null,
+  ].filter(Boolean);
+  return `<div class="pop"><h3 style="color:${st.c}">G-AIRMET: ${esc(st.label)}</h3>
+    <table>${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table></div>`;
+}
+function isigmetPopup(p){
+  const st = ISIGMET_STYLE[p.hazard] || OTHER;
+  const fcst = /F$/.test(p.seriesId||"");
+  const rows = [
+    ["Region", esc(p.firName || p.firId || "")],
+    p.qualifier ? ["Qualifier", esc(p.qualifier)] : null,
+    (p.base!=null||p.top!=null) ? ["Altitude", `${esc(lvl(p.base)||"?")} to ${esc(lvl(p.top)||"?")}`] : null,
+    ["Valid", `${fmtUTC(toDate(p.validTimeFrom))} – ${fmtUTC(toDate(p.validTimeTo))}`],
+    (p.dir||p.spd) ? ["Moving", `${esc(p.dir||"")} ${p.spd?esc(p.spd)+" kt":""}`] : null,
+    fcst ? ["Note", "Forecast position (dashed)"] : null,
+  ].filter(Boolean);
+  return `<div class="pop"><h3 style="color:${st.c}">SIGMET: ${esc(st.label)}</h3>
+    <table>${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>
+    ${p.rawSigmet?`<code>${esc(p.rawSigmet)}</code>`:""}</div>`;
+}
+
+function drawOverlay(name){
+  const o = overlays[name];
+  o.group.clearLayers();
+  const fc = o.data;
+  if(!fc) return;
+  const used = new Map();
+  for(const f of (fc.features||[])){
+    const p = f.properties || {};
+    if(!f.geometry) continue;
+    let st, dashed, weight, fill;
+    if(name === "gairmet"){
+      if(GAIRMET_SKIP.has(p.hazard)) continue;
+      st = GAIRMET_STYLE[p.hazard] || OTHER; dashed = true; weight = 2; fill = .08;
+    } else {
+      st = ISIGMET_STYLE[p.hazard] || OTHER; dashed = /F$/.test(p.seriesId||""); weight = dashed ? 1.5 : 2.5; fill = dashed ? .03 : .12;
+    }
+    used.set(st.label, {c: st.c, dashed: name === "gairmet"});
+    const gj = L.geoJSON(f, {pane: "hazards", style: () => ({color: st.c, weight, opacity: .9, fillColor: st.c, fillOpacity: fill, dashArray: dashed ? "6 5" : null})});
+    gj.bindPopup(() => name === "gairmet" ? gairmetPopup(p) : isigmetPopup(p), {maxWidth: 340});
+    o.group.addLayer(gj);
+  }
+  $(o.key).innerHTML = [...used].map(([label,v]) => `<span class="chip"><i class="${v.dashed?"dash":""}" style="border-color:${v.c}"></i>${esc(label)}</span>`).join("") || "None active right now";
+  const n = o.group.getLayers().length;
+  if(fc.error) $(o.info).textContent = "(couldn't load)";
+  else if(name === "gairmet"){
+    const vt = fc.validTime ? toDate(fc.validTime) : (fc.features?.[0] ? toDate(fc.features[0].properties.validTime) : null);
+    $(o.info).textContent = `(${n}${vt?`, valid ${fmtUTC(vt)}`:""})`;
+  } else $(o.info).textContent = `(${n} worldwide)`;
+}
+
+async function loadOverlay(name){
+  const o = overlays[name];
+  if(!$(o.box).checked) return;
+  try{
+    const res = await fetch(`${o.file}?t=${Date.now()}`, {cache:"no-store"});
+    if(!res.ok) throw new Error(res.status);
+    o.data = await res.json();
+  }catch(e){ o.data = {features: [], error: String(e)}; }
+  drawOverlay(name);
+}
+
+function setOverlay(name){
+  const o = overlays[name], on = $(o.box).checked;
+  $(o.box).closest(".ov").classList.toggle("on", on);
+  if(on){ o.group.addTo(map); loadOverlay(name); }
+  else { map.removeLayer(o.group); $(o.info).textContent = ""; }
+  try{ localStorage.setItem("ov_"+name, on ? "1" : "0"); }catch(e){}
+}
+for(const name of Object.keys(overlays)){
+  const o = overlays[name];
+  try{ $(o.box).checked = localStorage.getItem("ov_"+name) === "1"; }catch(e){}
+  $(o.box).onchange = () => setOverlay(name);
+}
+const loadOverlays = () => Object.keys(overlays).forEach(loadOverlay);
+
 function schedule(){
   clearInterval(timer); timer = null;
-  if($("auto").checked) timer = setInterval(load, REFRESH_MS);
+  if($("auto").checked) timer = setInterval(() => { load(); loadOverlays(); }, REFRESH_MS);
   status();
 }
 
 $("age").onchange = load;
 $("minInt").onchange = render;
 $("altMin").oninput = $("altMax").oninput = render;
-$("refresh").onclick = () => { load(); schedule(); };
+$("refresh").onclick = () => { load(); loadOverlays(); schedule(); };
 $("auto").onchange = schedule;
 setInterval(status, 30000);
 $("toggle").onclick = () => {
@@ -338,6 +478,7 @@ $("toggle").onclick = () => {
 if(matchMedia("(max-width:600px)").matches){ $("ctl").classList.add("collapsed"); }
 else { $("toggle").textContent = "Hide"; }
 altLabel(); load(); schedule();
+Object.keys(overlays).forEach(setOverlay);
 </script>
 </body>
 </html>
