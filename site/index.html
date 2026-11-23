@@ -231,7 +231,7 @@ function popup(r){
   const p = r.p, L1 = r.layer || {};
   const rows = [
     ["Intensity", `<b style="color:${color(r.rank)}">${LEVELS[r.rank].label}</b>${L1.int?` (${esc(L1.int)})`:""}`],
-    ["Altitude", esc(fmtFL(r.fl))],
+    ["Altitude", esc(fmtFL(r.fl)) + ({DURD:" · during descent", DURC:" · during climb"}[p.fltLvlType] || "")],
     (L1.bas||L1.top) ? ["Turb layer", `${L1.bas?("FL"+esc(L1.bas)):"?"} – ${L1.top?("FL"+esc(L1.top)):"?"}`] : null,
     L1.type ? ["Type", esc(L1.type)] : null,
     L1.freq ? ["Frequency", esc(L1.freq)] : null,
