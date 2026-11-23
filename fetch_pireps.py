@@ -70,6 +70,8 @@ def main(out):
         "count": len(reports),
         "reports": reports,
     }, separators=(",", ":")))
+    if reports:
+        print("sample report:", json.dumps(reports[0])[:1500])
     print(f"wrote {len(reports)} reports to {out} (truncated={truncated}, failed boxes={failures})")
 
 
