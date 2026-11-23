@@ -573,6 +573,35 @@ const QUAL = {SEV:"severe", EMBD:"embedded", FRQ:"frequent", OCNL:"occasional", 
 const COMPASS = {N:"north",NE:"northeast",E:"east",SE:"southeast",S:"south",SW:"southwest",W:"west",NW:"northwest",NNE:"north-northeast",ENE:"east-northeast",ESE:"east-southeast",SSE:"south-southeast",SSW:"south-southwest",WSW:"west-southwest",WNW:"west-northwest",NNW:"north-northwest"};
 const tbl = rows => `<table>${rows.filter(Boolean).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>`;
 
+// Decode G-AIRMET "due to" text, e.g. "CIG BLW 010 VIS BLW 3SM PCPN BR FG"
+// -> "Cloud ceilings below 1,000 ft and visibility under 3 miles, due to precipitation, mist and fog"
+const WX_WORDS = {
+  PCPN:"precipitation", RA:"rain", SHRA:"rain showers", DZ:"drizzle", SN:"snow", SHSN:"snow showers", BLSN:"blowing snow",
+  FZRA:"freezing rain", FZDZ:"freezing drizzle", PL:"ice pellets", GR:"hail", BR:"mist", FG:"fog", HZ:"haze", FU:"smoke",
+  DU:"dust", BLDU:"blowing dust", SA:"sand", TS:"thunderstorms", CLDS:"clouds", CLD:"clouds", VA:"volcanic ash",
+};
+const listWords = a => a.length <= 1 ? (a[0]||"") : a.slice(0,-1).join(", ") + " and " + a[a.length-1];
+function decodeCause(txt){
+  if(!txt) return null;
+  const toks = String(txt).toUpperCase().replace(/\//g," ").split(/\s+/).filter(Boolean);
+  const cond = [], wx = [], other = [];
+  for(let i=0; i<toks.length; i++){
+    const t = toks[i], n1 = toks[i+1], n2 = toks[i+2];
+    if(t === "CIG" && /^(BLW|BLO)$/.test(n1||"") && /^\d{3}$/.test(n2||"")){ cond.push(`cloud ceilings below ${(+n2*100).toLocaleString()} ft`); i += 2; continue; }
+    if(t === "VIS" && /^(BLW|BLO)$/.test(n1||"") && /^[\d/]+SM$/.test(n2||"")){ const m = n2.replace("SM",""); cond.push(`visibility under ${m} ${m==="1"?"mile":"miles"}`); i += 2; continue; }
+    if(t === "MTNS" && n1 === "OBSC"){ cond.push("mountains hidden"); i += 1; continue; }
+    if(t === "OBSC"){ cond.push("mountains hidden"); continue; }
+    if(WX_WORDS[t]){ if(!wx.includes(WX_WORDS[t])) wx.push(WX_WORDS[t]); continue; }
+    if(t === "BY") continue;
+    if(t === "BLW" || t === "BLO") { other.push("below"); continue; }
+    other.push(t.toLowerCase());
+  }
+  let s = listWords(cond);
+  if(wx.length) s += (s ? ", due to " : "Due to ") + listWords(wx);
+  if(other.length) s += (s ? " (" : "") + other.join(" ") + (s ? ")" : "");
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : null;
+}
+
 function gairmetPopup(p){
   const st = GAIRMET_STYLE[p.hazard] || OTHER;
   const sev = SEV_WORD[p.severity] || (/^TURB/.test(p.hazard) ? "moderate" : "");
@@ -583,11 +612,11 @@ function gairmetPopup(p){
   return `<div class="pop"><div class="urgent" style="color:${st.c}">G-AIRMET forecast</div>
     <h3>${esc(head.charAt(0).toUpperCase()+head.slice(1))}</h3>
     <div class="meta">${alt?esc(alt)+" · ":""}around ${esc(localTime(vt))}</div>
-    ${p.dueTo && p.hazard!=="ICE" ? `<p class="feel">Cause: ${esc(String(p.dueTo).toLowerCase())}</p>` : ""}
-    <details><summary>Pilot details</summary>
+    ${p.dueTo && p.hazard!=="ICE" && decodeCause(p.dueTo) ? `<p class="feel">${esc(decodeCause(p.dueTo))}.</p>` : ""}
+    <details><summary>Pilot details and original text</summary>
       ${tbl([["Product", esc(p.product||"")], ["Hazard", esc(p.hazard||"")], p.tag?["Tag", esc(p.tag)]:null,
         p.severity?["Severity", esc(p.severity)]:null, (p.base||p.top)?["Base / top", `${esc(p.base||"?")} / ${esc(p.top||"?")}`]:null,
-        p.dueTo?["Due to", esc(p.dueTo)]:null,
+        p.dueTo?["Due to (original)", `<code style="display:inline;padding:1px 4px">${esc(p.dueTo)}</code>`]:null,
         ["Valid", `${fmtUTC(vt)} (+${esc(p.forecast ?? "?")} h forecast)`], p.issueTime?["Issued", fmtUTC(toDate(p.issueTime))]:null])}
     </details></div>`;
 }
