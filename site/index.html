@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f1418">
+<title>Live Turbulence PIREPs</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{
+  --bg:#0f1418; --panel:#182027ee; --text:#e6edf2; --muted:#93a3b0; --line:#2b3741; --accent:#5fb3ff;
+  --none:#7d8b96; --lgt:#3fbf6f; --lgtmod:#c9d23a; --mod:#f2a030; --modsev:#ee6a2c; --sev:#e0343a; --extm:#b02bd6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#map{position:absolute;inset:0}
+.panel{position:absolute;z-index:1000;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;backdrop-filter:blur(6px)}
+#ctl{top:12px;left:12px;width:290px;max-width:calc(100vw - 32px)}
+#ctl h1{font-size:16px;margin:0 0 2px}
+#ctl .sub{color:var(--muted);font-size:12px;margin-bottom:10px}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+select,input[type=range]{width:100%}
+select{background:#0f1418;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px}
+.row{display:flex;gap:8px;align-items:center}
+.row label{margin:0;color:var(--text);font-size:13px;display:flex;gap:6px;align-items:center}
+#status{margin-top:10px;font-size:12px;color:var(--muted)}
+#status b{color:var(--text)}
+#err{margin-top:8px;font-size:12px;color:#ff9b9b;display:none}
+button{background:#22303a;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+#legend{bottom:22px;left:12px;font-size:12px}
+#legend div{display:flex;align-items:center;gap:7px;margin:2px 0}
+.sw{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid #0008}
+#counts{color:var(--muted);font-size:12px;margin-top:6px}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#182027;color:var(--text)}
+.leaflet-popup-content{margin:10px 12px;font-size:13px}
+.pop h3{margin:0 0 4px;font-size:14px}
+.pop table{border-collapse:collapse}
+.pop td{padding:1px 8px 1px 0;vertical-align:top}
+.pop td:first-child{color:var(--muted)}
+.pop code{display:block;margin-top:6px;white-space:pre-wrap;word-break:break-word;font-size:11px;color:#c9d6df;background:#0f1418;padding:6px;border-radius:6px}
+.urgent{color:#ff6b6b;font-weight:600}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+#toggle{display:none;flex:none}
+#legend .key{display:block}
+#legend .keys{display:block}
+@media (max-width:600px){
+  #ctl{top:auto;bottom:calc(10px + env(safe-area-inset-bottom));left:10px;right:10px;width:auto;padding:10px 12px}
+  #ctl h1{font-size:15px}
+  #ctl .sub{margin-bottom:0}
+  #toggle{display:block;padding:8px 12px}
+  #ctl.collapsed #body{display:none}
+  #body{margin-top:8px}
+  select{font-size:16px;padding:8px}
+  input[type=range]{height:28px}
+  .row label{font-size:15px}
+  #refresh{padding:8px 14px}
+  #legend{top:calc(10px + env(safe-area-inset-top));bottom:auto;left:10px;padding:6px 8px;font-size:11px;display:flex;flex-wrap:wrap;gap:2px 8px;max-width:calc(100vw - 70px)}
+  #legend div{margin:0}
+  #legend #counts{display:none}
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel" id="ctl">
+  <div class="head"><div><h1>Turbulence PIREPs</h1>
+  <div class="sub" id="mini">Pilot reports from NOAA Aviation Weather Center</div></div>
+  <button id="toggle" aria-expanded="true" title="Show or hide filters">Filters</button></div>
+  <div id="body">
+
+  <label for="age">Time window</label>
+  <select id="age">
+    <option value="1">Last 1 hour</option>
+    <option value="2" selected>Last 2 hours</option>
+    <option value="3">Last 3 hours</option>
+    <option value="6">Last 6 hours</option>
+  </select>
+
+  <label for="minInt">Minimum intensity</label>
+  <select id="minInt">
+    <option value="0">Everything (incl. smooth)</option>
+    <option value="1" selected>Light and above</option>
+    <option value="3">Moderate and above</option>
+    <option value="5">Severe and above</option>
+  </select>
+
+  <label>Altitude: <span id="altLbl"></span></label>
+  <div class="row"><input type="range" id="altMin" min="0" max="450" step="10" value="0"></div>
+  <div class="row"><input type="range" id="altMax" min="0" max="450" step="10" value="450"></div>
+
+  <div class="row" style="margin-top:10px;justify-content:space-between">
+    <label><input type="checkbox" id="auto" checked> Auto-refresh</label>
+    <button id="refresh">Refresh</button>
+  </div>
+  <div id="status">Loading…</div>
+  <div id="err"></div>
+  </div>
+</div>
+
+<div class="panel" id="legend">
+  <div><span class="sw" style="background:var(--extm)"></span>Extreme</div>
+  <div><span class="sw" style="background:var(--sev)"></span>Severe</div>
+  <div><span class="sw" style="background:var(--modsev)"></span>Moderate–severe</div>
+  <div><span class="sw" style="background:var(--mod)"></span>Moderate</div>
+  <div><span class="sw" style="background:var(--lgtmod)"></span>Light–moderate</div>
+  <div><span class="sw" style="background:var(--lgt)"></span>Light</div>
+  <div><span class="sw" style="background:var(--none)"></span>Smooth / none</div>
+  <div id="counts"></div>
+</div>
+
+<script>
+const AWC = "https://aviationweather.gov/api/data/pirep";
+const REFRESH_MS = 2 * 60 * 1000;
+
+// Intensity scale: rank, label, css color var
+const LEVELS = [
+  {k:"none",  label:"Smooth / none",   c:"--none"},
+  {k:"lgt",   label:"Light",           c:"--lgt"},
+  {k:"lgtmod",label:"Light–moderate",  c:"--lgtmod"},
+  {k:"mod",   label:"Moderate",        c:"--mod"},
+  {k:"modsev",label:"Moderate–severe", c:"--modsev"},
+  {k:"sev",   label:"Severe",          c:"--sev"},
+  {k:"extm",  label:"Extreme",         c:"--extm"},
+];
+const css = getComputedStyle(document.documentElement);
+const color = r => css.getPropertyValue(LEVELS[r].c).trim();
+
+// Map an intensity code such as "MOD", "LGT-MOD", "SEV", "NEG", "SMTH-LGT", "EXTRM" to a rank, or -1 if none.
+function rankOf(code){
+  if(!code) return -1;
+  const s = String(code).toUpperCase().replace(/\s+/g,"");
+  const has = w => s.includes(w);
+  const ext = has("EXTM")||has("EXTRM")||has("XTRM")||has("EXTREME");
+  const sev = has("SEV");
+  const mod = has("MOD");
+  const lgt = has("LGT")||has("LIGHT")||has("LT");
+  if(ext && sev) return 6; if(ext) return 6;
+  if(sev && mod) return 4; if(sev) return 5;
+  if(mod && lgt) return 2; if(mod) return 3;
+  if(lgt) return 1;
+  if(has("NEG")||has("SMTH")||has("SMOOTH")||has("NIL")||has("NONE")) return 0;
+  return -1;
+}
+
+// Pick the worst turbulence intensity in a report. Uses the parsed fields first,
+// then falls back to the /TB group in the raw report text.
+function turbOf(p){
+  let best = -1, layer = null;
+  for(const i of [1,2]){
+    const r = rankOf(p["tbInt"+i]);
+    if(r > best){
+      best = r;
+      layer = {bas:p["tbBas"+i], top:p["tbTop"+i], type:p["tbType"+i], freq:p["tbFreq"+i], int:p["tbInt"+i]};
+    }
+  }
+  if(best < 0 && p.rawOb){
+    const m = String(p.rawOb).match(/\/TB\s+([^/]+)/);
+    if(m){ best = rankOf(m[1]); if(best>=0) layer = {int:m[1].trim()}; }
+  }
+  return {rank:best, layer};
+}
+
+function obsDate(p){
+  const t = p.obsTime ?? p.receiptTime;
+  if(t == null) return null;
+  if(typeof t === "number") return new Date(t < 1e12 ? t*1000 : t);
+  const d = new Date(String(t).replace(" ","T") + (/[zZ]|[+-]\d\d:?\d\d$/.test(t) ? "" : "Z"));
+  return isNaN(d) ? null : d;
+}
+function flOf(p){
+  const n = parseInt(p.fltLvl, 10);
+  return isNaN(n) ? null : n;
+}
+const fmtFL = fl => fl == null ? "unknown" : `FL${String(fl).padStart(3,"0")} (${(fl*100).toLocaleString()} ft)`;
+function ago(d){
+  const m = Math.round((Date.now()-d)/60000);
+  return m < 60 ? `${m} min ago` : `${Math.floor(m/60)} h ${m%60} min ago`;
+}
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// ---------- map ----------
+const map = L.map("map", {zoomControl:false, worldCopyJump:true}).setView([39, -97], matchMedia("(max-width:600px)").matches ? 3 : 4);
+L.control.zoom({position:"topright"}).addTo(map);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  maxZoom: 10, subdomains:"abcd",
+  attribution: '&copy; OpenStreetMap &copy; CARTO · Data: NOAA AWC'
+}).addTo(map);
+const layer = L.layerGroup().addTo(map);
+
+let reports = [];
+let lastFetch = null, source = null, timer = null;
+
+const $ = id => document.getElementById(id);
+function altLabel(){
+  let a = +$("altMin").value, b = +$("altMax").value;
+  if(a > b) [a,b] = [b,a];
+  $("altLbl").textContent = `${a===0?"Surface":"FL"+String(a).padStart(3,"0")} to ${b>=450?"FL450+":"FL"+String(b).padStart(3,"0")}`;
+  return [a,b];
+}
+
+function render(){
+  layer.clearLayers();
+  const minInt = +$("minInt").value;
+  const [a,b] = altLabel();
+  const counts = new Array(LEVELS.length).fill(0);
+  let shown = 0;
+  // draw weakest first so severe reports sit on top
+  const list = reports
+    .filter(r => r.rank >= minInt)
+    .filter(r => r.fl == null ? (a===0 && b>=450) : (r.fl >= a && (b>=450 || r.fl <= b)))
+    .sort((x,y) => x.rank - y.rank);
+  for(const r of list){
+    counts[r.rank]++; shown++;
+    const m = L.circleMarker([r.lat, r.lon], {
+      radius: 4 + r.rank*1.3, color: r.urgent ? "#fff" : "#000", weight: r.urgent ? 2 : 1,
+      fillColor: color(r.rank), fillOpacity: .9, opacity: .8
+    });
+    m.bindPopup(() => popup(r), {maxWidth: 320});
+    m.bindTooltip(`${LEVELS[r.rank].label} · ${fmtFL(r.fl)}`, {direction:"top", offset:[0,-4]});
+    layer.addLayer(m);
+  }
+  $("counts").innerHTML = `${shown} shown of ${reports.length} turbulence reports`;
+  status();
+}
+
+function popup(r){
+  const p = r.p, L1 = r.layer || {};
+  const rows = [
+    ["Intensity", `<b style="color:${color(r.rank)}">${LEVELS[r.rank].label}</b>${L1.int?` (${esc(L1.int)})`:""}`],
+    ["Altitude", esc(fmtFL(r.fl))],
+    (L1.bas||L1.top) ? ["Turb layer", `${L1.bas?("FL"+esc(L1.bas)):"?"} – ${L1.top?("FL"+esc(L1.top)):"?"}`] : null,
+    L1.type ? ["Type", esc(L1.type)] : null,
+    L1.freq ? ["Frequency", esc(L1.freq)] : null,
+    ["Time", r.t ? `${r.t.toUTCString().slice(17,22)}Z · ${ago(r.t)}` : "unknown"],
+    p.acType ? ["Aircraft", esc(p.acType)] : null,
+    p.icaoId ? ["Near", esc(p.icaoId)] : null,
+    (p.temp!=null && p.temp!=="") ? ["Temp", esc(p.temp)+"°C"] : null,
+    (p.wdir!=null && p.wspd!=null && p.wdir!=="") ? ["Wind", `${esc(p.wdir)}° / ${esc(p.wspd)} kt`] : null,
+  ].filter(Boolean);
+  return `<div class="pop"><h3>${r.urgent?'<span class="urgent">URGENT </span>':""}${esc(p.pirepType||"PIREP")}</h3>
+    <table>${rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>
+    ${p.rawOb?`<code>${esc(p.rawOb)}</code>`:""}</div>`;
+}
+
+function status(){
+  if(!lastFetch) return;
+  const next = $("auto").checked && timer ? ` · next in ${Math.max(0,Math.round((lastFetch.getTime()+REFRESH_MS-Date.now())/60000))} min` : "";
+  const asOf = dataAsOf || lastFetch;
+  const mins = Math.max(0, Math.round((Date.now()-asOf)/60000));
+  const shown = layer.getLayers().length;
+  $("status").innerHTML = `Data as of <b>${asOf.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}</b> (${mins} min old)${next}<br>via ${esc(source)}${truncated?"<br>Some regions hit AWC's 400-report limit, so a few reports may be missing.":""}`;
+  $("mini").textContent = `${shown} reports · data ${mins} min old`;
+}
+
+// Data sources, in order:
+//  1. pirep.json next to the page (hosted on GitHub Pages, refreshed by a scheduled job)
+//  2. api/pirep on the local proxy (serve.py)
+//  3. aviationweather.gov directly (AWC doesn't permit cross-origin requests, so this usually fails)
+async function getJSON(age){
+  const qs = `format=json&type=turb&age=${age}`;
+  const tries = [];
+  if(location.protocol.startsWith("http")){
+    tries.push(["snapshot", `pirep.json?t=${Date.now()}`]);
+    tries.push(["local proxy", `api/pirep?${qs}`]);
+  }
+  tries.push(["aviationweather.gov", `${AWC}?${qs}`]);
+  let lastErr;
+  for(const [name,url] of tries){
+    try{
+      const res = await fetch(url, {cache:"no-store"});
+      if(!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
+      const txt = await res.text();
+      const data = txt.trim() ? JSON.parse(txt) : [];
+      return {name, data};
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr;
+}
+
+let dataAsOf = null, truncated = false;
+async function load(){
+  $("err").style.display = "none";
+  if(!lastFetch) $("status").textContent = "Loading…";
+  try{
+    const age = +$("age").value;
+    const {name, data} = await getJSON(age);
+    let arr;
+    if(Array.isArray(data)){ arr = data; dataAsOf = new Date(); truncated = arr.length >= 400; }
+    else if(data.reports){ arr = data.reports; dataAsOf = data.fetchedAt ? new Date(data.fetchedAt) : null; truncated = !!data.truncated; }
+    else { arr = data.features ? data.features.map(f=>f.properties) : []; dataAsOf = new Date(); }
+    const cutoff = Date.now() - age*3600e3;
+    reports = [];
+    for(const p of arr){
+      const lat = +p.lat, lon = +p.lon;
+      if(!isFinite(lat) || !isFinite(lon)) continue;
+      const {rank, layer} = turbOf(p);
+      if(rank < 0) continue; // no turbulence info (e.g. icing-only report)
+      const t = obsDate(p);
+      if(t && t.getTime() < cutoff) continue;
+      reports.push({p, lat, lon, rank, layer, fl: flOf(p), t,
+        urgent: /UUA|URGENT/i.test(p.pirepType||"") || /^\S+\s+UUA/.test(p.rawOb||"")});
+    }
+    source = name === "snapshot" ? "NOAA AWC (hosted snapshot)" : name; lastFetch = new Date();
+    render();
+  }catch(e){
+    $("status").textContent = "Couldn't load reports.";
+    const e2 = $("err");
+    e2.style.display = "block";
+    e2.innerHTML = location.protocol.startsWith("http")
+      ? `Error: ${esc(e.message)}`
+      : `Your browser blocked the direct request to aviationweather.gov. Run <b>python3 serve.py</b> in this folder and open <b>http://localhost:8765</b> instead.`;
+  }
+}
+
+function schedule(){
+  clearInterval(timer); timer = null;
+  if($("auto").checked) timer = setInterval(load, REFRESH_MS);
+  status();
+}
+
+$("age").onchange = load;
+$("minInt").onchange = render;
+$("altMin").oninput = $("altMax").oninput = render;
+$("refresh").onclick = () => { load(); schedule(); };
+$("auto").onchange = schedule;
+setInterval(status, 30000);
+$("toggle").onclick = () => {
+  const c = $("ctl").classList.toggle("collapsed");
+  $("toggle").setAttribute("aria-expanded", String(!c));
+  $("toggle").textContent = c ? "Filters" : "Hide";
+};
+if(matchMedia("(max-width:600px)").matches){ $("ctl").classList.add("collapsed"); }
+else { $("toggle").textContent = "Hide"; }
+altLabel(); load(); schedule();
+</script>
+</body>
+</html>
