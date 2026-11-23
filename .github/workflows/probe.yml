@@ -1,0 +1,12 @@
+name: Probe overlay sources
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "=== IEM tile"
+          curl -s -o t.png -w "HTTP %{http_code} %{content_type} %{size_download}\n" "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/5/7/12.png"
+          file t.png
+          echo "=== open-meteo"
+          curl -s -A "turbulence-map/1.0" "https://api.open-meteo.com/v1/gfs?latitude=40,35&longitude=-100,-90&hourly=wind_speed_250hPa,wind_direction_250hPa,wind_speed_300hPa&wind_speed_unit=kn&forecast_days=1&timezone=UTC" -w "\nHTTP %{http_code}\n" | head -c 1800
