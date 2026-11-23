@@ -1,0 +1,37 @@
+name: Probe radar sources (test branch only)
+on:
+  push:
+    branches: [probe-radar]
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p probe && cd probe
+          UA="turbulence-map/1.0"
+          BB="-126,24,-66,50"; W=1500; H=700
+          echo "=== NWS opengeo capabilities (QC'd layers)"
+          curl -s -A "$UA" "https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&request=GetCapabilities" -o caps.xml -w "HTTP %{http_code} %{size_download}\n"
+          grep -o "<Name>[^<]*</Name>" caps.xml | head -20
+          echo "=== QC'd base reflectivity (MRMS) CONUS"
+          curl -s -D h1.txt -A "$UA" -H "Origin: https://dtrnr001.github.io" "https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows?service=WMS&version=1.1.1&request=GetMap&layers=conus_bref_qcd&styles=&format=image/png&transparent=true&srs=EPSG:4326&bbox=$BB&width=$W&height=$H" -o qcd.png -w "HTTP %{http_code} %{content_type} %{size_download}\n"
+          grep -i "access-control" h1.txt || echo "(no CORS header)"
+          echo "=== IEM n0q (current source) CONUS via WMS"
+          curl -s -D h2.txt -A "$UA" "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?service=WMS&version=1.1.1&request=GetMap&layers=nexrad-n0q&styles=&format=image/png&transparent=true&srs=EPSG:4326&bbox=$BB&width=$W&height=$H" -o iem.png -w "HTTP %{http_code} %{content_type} %{size_download}\n"
+          echo "=== IEM tile CORS"
+          curl -s -D h3.txt -o /dev/null -H "Origin: https://dtrnr001.github.io" "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/5/7/12.png"; grep -i "access-control" h3.txt || echo "(no CORS header on IEM tiles)"
+          file *.png
+          python3 - <<'PY'
+          from PIL import Image
+          for n in ("qcd.png","iem.png"):
+              try:
+                  im=Image.open(n).convert("RGBA"); px=sum(1 for p in im.getdata() if p[3]>0); print(n, im.size, "colored pixels:", px)
+              except Exception as e: print(n, e)
+          PY
+          date -u > when.txt
+      - run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add probe && git commit -m "probe results" && git push
