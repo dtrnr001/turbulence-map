@@ -1019,48 +1019,97 @@ const WindCanvas = L.Layer.extend({
     c.width = size.x * dpr; c.height = size.y * dpr; c.style.width = size.x + "px"; c.style.height = size.y + "px";
     L.DomUtil.setPosition(c, m.containerPointToLayerPoint([0, 0]));
     c.style.visibility = "visible";
-    this._dpr = dpr;
-    const SP = 20; // pixels between arrows
-    this._arrows = [];
-    for(let row = 0, y = SP/2; y < size.y; y += SP, row++){
-      for(let x = SP/2 + (row % 2 ? SP/2 : 0); x < size.x; x += SP){ // staggered rows look less like a grid
-        const ll = m.containerPointToLatLng([x, y]);
-        const w = windAt(ll.lat, ((ll.lng + 180) % 360 + 360) % 360 - 180);
-        if(!w) continue;
-        const a = w.to * Math.PI / 180;
-        this._arrows.push({x, y, dx: Math.sin(a), dy: -Math.cos(a), kt: w.kt, len: Math.min(16, 6 + w.kt / 14), col: windColor(w.kt), alpha: w.kt < 60 ? .5 : .95});
-      }
+    this._dpr = dpr; this._w = size.x; this._h = size.y;
+    // Sample the wind onto a coarse screen grid once per pan/zoom, so each frame is just a lookup.
+    const CELL = this._cell = 12;
+    const cols = this._cols = Math.ceil(size.x / CELL) + 1, rows = Math.ceil(size.y / CELL) + 1;
+    this._field = new Array(cols * rows);
+    this._cells = [];
+    for(let r = 0; r < rows; r++) for(let q = 0; q < cols; q++){
+      const ll = m.containerPointToLatLng([q * CELL, r * CELL]);
+      const w = windAt(ll.lat, ((ll.lng + 180) % 360 + 360) % 360 - 180);
+      if(!w){ this._field[r * cols + q] = null; continue; }
+      const ang = w.to * Math.PI / 180;
+      this._field[r * cols + q] = {dx: Math.sin(ang), dy: -Math.cos(ang), kt: w.kt, col: windColor(w.kt)};
+      this._cells.push(r * cols + q);
     }
-    this._draw(performance.now());
+    // Arrows come out of "streams": each stream releases an arrow every ~0.5 s from one spot,
+    // and since they all follow the same wind they line up into little trains.
+    const area = this._cells.length * CELL * CELL;
+    this._max = Math.min(1500, Math.round(area / 500));
+    this._parts = []; this._streams = [];
+    if(reduceMotion.matches){
+      for(let i = 0; i < this._max / 2; i++){ const p = {}; this._spawn(p, true); this._parts.push(p); }
+    } else {
+      const ns = Math.max(1, Math.round(this._max / 4));
+      for(let i = 0; i < ns; i++){ const s = {}; this._spawn(s, true); s.t = Math.random() * .5; this._streams.push(s); }
+      for(let i = 0; i < 120; i++) this._step(.05);  // warm up so the map doesn't start empty
+    }
+    this._last = performance.now();
+    this._draw(this._last);
     if(!reduceMotion.matches && !this._raf) this._loop();
   },
+  _spawn(p, anyAge){
+    if(!this._cells.length){ p.dead = true; return; }
+    const k = this._cells[(Math.random() * this._cells.length) | 0], q = k % this._cols, r = (k / this._cols) | 0;
+    p.x = (q + Math.random() - .5) * this._cell; p.y = (r + Math.random() - .5) * this._cell;
+    p.life = 3 + Math.random() * 4; p.age = anyAge ? Math.random() * p.life : 0; p.dead = false;
+  },
+  _at(x, y){
+    const q = Math.round(x / this._cell), r = Math.round(y / this._cell);
+    if(q < 0 || r < 0 || q >= this._cols || r * this._cols >= this._field.length) return null;
+    return this._field[r * this._cols + q];
+  },
   _loop(){
-    let last = 0;
     const tick = t => {
-      this._raf = requestAnimationFrame(tick);
-      if(t - last < 50) return; // about 20 frames a second is plenty
-      last = t; this._draw(t);
+      this._raf = requestAnimationFrame(tick);   // the browser pauses this when the tab is hidden
+      if(t - this._last < 33) return;            // about 30 frames a second
+      this._draw(t);
     };
-    this._raf = requestAnimationFrame(tick); // the browser pauses this when the tab is hidden
+    this._raf = requestAnimationFrame(tick);
+  },
+  _step(dt){
+    for(const s of this._streams){
+      s.age += dt; s.t -= dt;
+      if(s.age > s.life + 4){ this._spawn(s, false); s.life = 6 + Math.random() * 8; }  // move the stream somewhere new now and then
+      if(s.t <= 0 && s.age < s.life && this._parts.length < this._max){
+        this._parts.push({x: s.x, y: s.y, age: 0, life: 5 + Math.random() * 2});
+        s.t = .5;
+      }
+    }
+    const keep = [];
+    for(const p of this._parts){
+      const f = this._at(p.x, p.y);
+      p.age += dt;
+      if(!f || p.age > p.life || p.x < -10 || p.y < -10 || p.x > this._w + 10 || p.y > this._h + 10) continue;
+      const v = 6 + f.kt * .22;                 // pixels per second: 100 kt ≈ 28 px/s
+      p.x += f.dx * v * dt; p.y += f.dy * v * dt; p.f = f;
+      keep.push(p);
+    }
+    this._parts = keep;
   },
   _draw(t){
     const c = this._c; if(!c) return;
+    const dt = Math.min(.1, (t - (this._last || t)) / 1000); this._last = t;
+    if(!reduceMotion.matches) this._step(dt);
     const ctx = c.getContext("2d"), s = this._dpr;
     ctx.setTransform(s, 0, 0, s, 0, 0);
-    ctx.clearRect(0, 0, c.width, c.height);
-    ctx.lineCap = "round"; ctx.lineJoin = "round";
-    const still = reduceMotion.matches, sec = t / 1000;
-    for(const a of this._arrows){
-      // a ripple that travels downwind, faster and stronger in stronger wind
-      const along = a.x * a.dx + a.y * a.dy;
-      const amp = still ? 0 : 1 + a.kt / 70, wob = Math.sin(sec * (2 + a.kt / 40) - along / 35);
-      const ox = a.x + a.dx * amp * wob, oy = a.y + a.dy * amp * wob;
-      const hx = ox + a.dx * a.len / 2, hy = oy + a.dy * a.len / 2, tx = ox - a.dx * a.len / 2, ty = oy - a.dy * a.len / 2;
-      ctx.globalAlpha = a.alpha; ctx.strokeStyle = a.col; ctx.lineWidth = a.kt >= 90 ? 1.8 : 1.4;
-      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy);
-      // arrowhead
-      const hl = Math.min(4.5, a.len * .4), px = -a.dy, py = a.dx;
-      ctx.moveTo(hx - a.dx * hl + px * hl * .6, hy - a.dy * hl + py * hl * .6); ctx.lineTo(hx, hy); ctx.lineTo(hx - a.dx * hl - px * hl * .6, hy - a.dy * hl - py * hl * .6);
+    ctx.clearRect(0, 0, this._w, this._h);
+    ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 1.2;
+    const still = reduceMotion.matches;
+    for(const p of this._parts){
+      if(p.dead) continue;
+      const f = this._at(p.x, p.y);
+      if(!f) continue;
+      // fade in and out so arrows don't pop
+      const fade = still ? 1 : Math.min(1, p.age / .6, (p.life - p.age) / .6);
+      ctx.globalAlpha = Math.max(0, fade) * (f.kt < 60 ? .3 : .55);
+      ctx.strokeStyle = f.col;
+      const len = Math.min(7, 4 + f.kt / 40), hl = 2.4, px = -f.dy, py = f.dx;
+      const hx = p.x + f.dx * len / 2, hy = p.y + f.dy * len / 2;
+      ctx.beginPath();
+      ctx.moveTo(p.x - f.dx * len / 2, p.y - f.dy * len / 2); ctx.lineTo(hx, hy);
+      ctx.moveTo(hx - f.dx * hl + px * hl * .7, hy - f.dy * hl + py * hl * .7); ctx.lineTo(hx, hy); ctx.lineTo(hx - f.dx * hl - px * hl * .7, hy - f.dy * hl - py * hl * .7);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
