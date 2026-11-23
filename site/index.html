@@ -18,19 +18,14 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/
 #map{position:absolute;inset:0;background:#1b2228}
 .dark-tiles{filter:grayscale(1) invert(1) brightness(.95) contrast(.6)} /* plain gray: no green forests, so radar colors stand out */
 .panel{position:absolute;z-index:1000;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;backdrop-filter:blur(6px)}
-#ctl{top:12px;left:12px;width:290px;max-width:calc(100vw - 32px)}
-#ctl h1{font-size:16px;margin:0 0 2px}
-#ctl .sub{color:var(--muted);font-size:12px;margin-bottom:10px}
 label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
 select,input[type=range]{width:100%}
 select{background:#0f1418;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px}
 .row{display:flex;gap:8px;align-items:center}
 .row label{margin:0;color:var(--text);font-size:13px;display:flex;gap:6px;align-items:center}
-#status{margin-top:10px;font-size:12px;color:var(--muted)}
-#status b{color:var(--text)}
-#err{margin-top:8px;font-size:12px;color:#ff9b9b;display:none}
+#err{margin-top:6px;font-size:12px;color:#ff9b9b;display:none;max-width:260px}
 button{background:#22303a;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
-button:hover{border-color:var(--accent)}
+@media (hover:hover){button:hover{border-color:var(--accent)}}
 #legend{bottom:22px;left:12px;font-size:12px}
 .ov{margin:4px 0 6px}
 .ov > label{margin:0;color:var(--text);font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -42,7 +37,7 @@ button:hover{border-color:var(--accent)}
 .chip i.dash{border-top-style:dashed}
 #legend div{display:flex;align-items:center;gap:7px;margin:2px 0}
 .sw{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid #0008}
-#counts{color:var(--muted);font-size:12px;margin-top:6px}
+#counts{color:var(--muted);font-size:11px;margin-top:6px}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#182027;color:var(--text)}
 .leaflet-popup-content{margin:10px 12px;font-size:13px}
 .pop h3{margin:0 0 4px;font-size:14px}
@@ -61,10 +56,14 @@ button:hover{border-color:var(--accent)}
 .pop summary{cursor:pointer;color:var(--accent);font-size:12px}
 .pop details table{margin-top:6px;font-size:12px}
 .btns{display:flex;gap:6px;flex:none}
-.quick{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 9px;color:var(--text);font:13px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;gap:4px}
-.quick label{display:flex;gap:6px;align-items:center;cursor:pointer;white-space:nowrap}
-.quick input{width:16px;height:16px;margin:0}
-.windkey{font-size:10px;color:var(--muted);max-width:120px;line-height:1.35}
+#layers{top:92px;right:12px;padding:8px 10px;width:190px;font-size:13px}
+#layers h5{margin:0 0 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+#layers .ov{margin:3px 0}
+#layers .ov > label{font-size:13px}
+#layers input{width:16px;height:16px;margin:0;flex:none}
+#layers .chips{margin:2px 0 4px 22px;gap:2px 8px}
+#layers .ovinfo{display:block;width:100%}
+.windkey{font-size:10px;color:var(--muted);margin:0 0 4px 22px;line-height:1.35}
 .windkey[hidden]{display:none}
 .windcanvas{position:absolute;left:0;top:0;pointer-events:none}
 #routeIn{flex:1;min-width:0;background:#0f1418;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;text-transform:uppercase}
@@ -89,52 +88,97 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
 .sheet-card ul{padding-left:18px}
 .sheet-card .x{position:absolute;top:10px;right:10px;width:32px;height:32px;padding:0;font-size:20px;line-height:1;border-radius:50%}
 .head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-#toggle{display:none;flex:none}
-#legend .key{display:block}
-#legend .keys{display:block}
+/* ---------- layout: header with data age, two buttons, two panels ---------- */
+#left{position:absolute;z-index:1000;top:12px;left:12px;width:300px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+#left > *{pointer-events:auto}
+#left .panel{position:relative}
+#head{padding:10px 12px;z-index:1000}
+#head h1{font-size:15px;margin:0}
+#fresh{display:inline-flex;white-space:nowrap;align-items:center;gap:7px;margin-top:6px;border-radius:999px;padding:4px 11px 4px 9px;font-size:13px;background:#0f1418}
+#fresh i{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+#fresh.ok i{background:#3fbf6f;box-shadow:0 0 0 3px #3fbf6f33}
+#fresh.stale i{background:#f2a030}
+#fresh.old i{background:#e0343a}
+#fresh.old{color:#ffb4b4}
+#routeChip{display:block;margin-top:6px;background:none;border:none;padding:0;color:#e9d68b;font-size:13px;text-align:left}
+#routeChip[hidden]{display:none}
+#bar{display:flex;gap:8px}
+#bar button{flex:1;padding:8px 10px;font-size:14px;font-weight:600;background:var(--panel);border-radius:10px;position:relative;backdrop-filter:blur(6px)}
+#bar button[aria-expanded=true]{border-color:var(--accent);color:var(--accent)}
+#bar .dotmark{position:absolute;top:6px;right:8px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+#bar .dotmark[hidden]{display:none}
+.drawer{position:relative;max-height:calc(100vh - 190px);overflow-y:auto}
+.drawer[hidden]{display:none}
+.drawer h2{font-size:15px;margin:0 0 2px}
+.drawer .x{position:absolute;top:8px;right:8px;width:30px;height:30px;padding:0;font-size:18px;line-height:1;border-radius:50%}
+.grab{display:none}
+.resetf{margin-top:10px}
+/* two-handle altitude slider */
+.dual{position:relative;height:34px;margin:2px 9px 0}
+.dual .track,.dual .fill{position:absolute;top:15px;height:4px;border-radius:2px}
+.dual .track{left:0;right:0;background:#2b3741}
+.dual .fill{background:var(--accent)}
+.dual input{position:absolute;left:-9px;width:calc(100% + 18px);top:0;height:34px;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none}
+.dual input::-webkit-slider-runnable-track{background:none;height:34px}
+.dual input::-moz-range-track{background:none}
+.dual input::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:auto;width:22px;height:22px;margin-top:6px;border-radius:50%;background:#e6edf2;border:2px solid var(--accent);cursor:grab}
+.dual input::-moz-range-thumb{pointer-events:auto;width:18px;height:18px;border-radius:50%;background:#e6edf2;border:2px solid var(--accent);cursor:grab}
+.ticks{position:relative;height:16px;margin:0 9px;font-size:10px;color:var(--muted)}
+.ticks span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.ticks span::before{content:"";position:absolute;left:50%;top:-8px;width:1px;height:5px;background:#55636e}
+.ticks span.end::before{display:none}
+#altLbl{color:var(--text);font-weight:600}
 @media (max-width:600px){
-  #ctl{top:auto;bottom:calc(10px + env(safe-area-inset-bottom));left:10px;right:10px;width:auto;padding:10px 12px;max-height:72vh;overflow-y:auto}
-  #ctl h1{font-size:15px}
-  #ctl .sub{margin-bottom:0}
-  #toggle{display:block;padding:8px 12px}
-  #helpBtn{width:38px;height:38px}
-  .quick{font-size:13px;padding:6px 8px}
-  .quick input{width:18px;height:18px}
-  .sheet{align-items:flex-end;padding:0}
-  .sheet-card{border-radius:14px 14px 0 0;max-height:88vh;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
-  #ctl.collapsed #body{display:none}
-  #body{margin-top:8px}
+  #left{top:calc(10px + env(safe-area-inset-top));left:10px;width:auto;max-width:calc(100vw - 180px);z-index:auto}
+  #head h1{font-size:14px;white-space:nowrap}
+  #layers{top:calc(10px + env(safe-area-inset-top));right:10px;width:152px;padding:7px 9px}
+  #layers .ov > label{font-size:14px}
+  #layers input{width:18px;height:18px}
+  .leaflet-control-zoom{display:none}
+  #helpBtn{width:30px;height:30px;padding:0}
+  #bar{position:fixed;left:10px;right:10px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:1100}
+  .leaflet-control-attribution{font-size:9px}
+  #bar button{padding:12px 10px;font-size:15px}
+  #legend{bottom:calc(78px + env(safe-area-inset-bottom));left:10px;right:10px;padding:6px 9px;font-size:11px;display:flex;flex-wrap:wrap;gap:2px 9px}
+  #legend div{margin:0}
+  #legend #counts{width:100%;margin-top:2px;font-size:10px}
+  #left .drawer{position:fixed;left:0;right:0;bottom:0;z-index:1200;max-height:72vh;border-radius:16px 16px 0 0;padding:6px 16px calc(16px + env(safe-area-inset-bottom));transition:transform .2s}
+  .grab{display:block;width:40px;height:5px;border-radius:3px;background:#55636e;margin:2px auto 8px}
+  .drawhead{touch-action:none}
   select{font-size:16px;padding:8px}
   #routeIn{font-size:16px;padding:8px}
   select.inline{font-size:14px;padding:2px}
   #routeGo{padding:8px 14px}
-  input[type=range]{height:28px}
-  .row label,.ov > label{font-size:15px}
-  .ov input[type=checkbox],.row input[type=checkbox]{width:18px;height:18px}
-  #refresh{padding:8px 14px}
-  #legend{top:calc(10px + env(safe-area-inset-top));bottom:auto;left:10px;padding:6px 8px;font-size:11px;display:flex;flex-wrap:wrap;gap:2px 8px;max-width:calc(100vw - 70px)}
-  #legend div{margin:0}
-  #legend #counts{display:none}
+  .sheet{align-items:flex-end;padding:0}
+  .sheet-card{border-radius:14px 14px 0 0;max-height:88vh;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
 }
 </style>
 </head>
 <body>
 <div id="map"></div>
 
-<div class="panel" id="ctl">
-  <div class="head"><div><h1>Turbulence PIREPs</h1>
-  <div class="sub" id="mini">Pilot reports from NOAA Aviation Weather Center</div></div>
-  <div class="btns"><button id="helpBtn" title="How to read this map" aria-label="Help">?</button>
-  <button id="toggle" aria-expanded="true" title="Show or hide filters">Filters</button></div></div>
-  <div id="body">
+<div id="left">
+  <div class="panel" id="head">
+    <div class="head"><h1>Turbulence PIREPs</h1><button id="helpBtn" title="How to read this map" aria-label="Help">?</button></div>
+    <button id="fresh" title="Tap to refresh"><i></i><span id="freshTxt">Loading…</span></button>
+    <button id="routeChip" hidden></button>
+    <div id="err"></div>
+  </div>
+  <div id="bar">
+    <button id="btnFlight" aria-expanded="false" aria-controls="pFlight">✈ My flight</button>
+    <button id="btnFilters" aria-expanded="false" aria-controls="pFilters">Filters<span class="dotmark" id="filtDot" hidden></span></button>
+  </div>
+  <div class="panel drawer" id="pFlight" hidden>
+    <div class="drawhead"><div class="grab"></div><h2>My flight</h2></div>
+    <button class="x" aria-label="Close">×</button>
   <form id="routeForm" autocomplete="off">
-    <label for="routeIn">My flight</label>
+    <label for="routeIn">Airports or flight numbers</label>
     <div class="row">
       <input id="routeIn" type="text" inputmode="text" autocapitalize="characters" spellcheck="false" placeholder="JFK DEN SFO, or DL1234">
       <button id="routeGo" type="submit">Show</button>
     </div>
     <div class="row" style="margin-top:4px;justify-content:space-between">
-      <span class="muted small">Airports in order (layovers too), or flight numbers. Within
+      <span class="muted small">In order, layovers too. Highlight within
         <select id="corridor" class="inline"><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option></select> mi</span>
       <button id="routeClear" type="button" class="link" hidden>Clear</button>
     </div>
@@ -142,6 +186,10 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   </form>
   <div id="routeSum"></div>
 
+  </div>
+  <div class="panel drawer" id="pFilters" hidden>
+    <div class="drawhead"><div class="grab"></div><h2>Filters</h2></div>
+    <button class="x" aria-label="Close">×</button>
   <label for="age">Time window</label>
   <select id="age">
     <option value="1">Last 1 hour</option>
@@ -166,28 +214,31 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   </select>
 
   <label>Altitude: <span id="altLbl"></span></label>
-  <div class="row"><input type="range" id="altMin" min="0" max="450" step="10" value="0"></div>
-  <div class="row"><input type="range" id="altMax" min="0" max="450" step="10" value="450"></div>
-
-  <label>Overlays</label>
-  <div class="ov">
-    <label><input type="checkbox" id="ovGairmet"> G-AIRMETs <span class="ovinfo" id="infoGairmet"></span></label>
-    <div class="chips" id="keyGairmet"></div>
+  <div class="dual">
+    <div class="track"></div><div class="fill" id="altFill"></div>
+    <input type="range" id="altMin" min="0" max="450" step="10" value="0" aria-label="Lowest altitude">
+    <input type="range" id="altMax" min="0" max="450" step="10" value="450" aria-label="Highest altitude">
   </div>
-  <div class="ov">
-    <label><input type="checkbox" id="ovIsigmet"> International SIGMETs <span class="ovinfo" id="infoIsigmet"></span></label>
-    <div class="chips" id="keyIsigmet"></div>
-  </div>
-
-  <div class="row" style="margin-top:10px;justify-content:space-between">
-    <label><input type="checkbox" id="auto" checked> Auto-refresh</label>
-    <button id="refresh">Refresh</button>
-  </div>
-  <div id="status">Loading…</div>
-  <div id="err"></div>
+  <div class="ticks"><span class="end" style="left:0">Ground</span><span style="left:22.2%">10k</span><span style="left:40%">18k</span><span style="left:66.7%">30k</span><span class="end" style="left:100%;transform:translateX(-90%)">45k+</span></div>
+  <button id="resetF" class="link resetf" hidden>Reset filters</button>
   </div>
 </div>
+<div class="panel" id="layers">
+  <h5>Layers</h5>
+  <div class="ov"><label><input type="checkbox" id="qtRadar"> Radar</label></div>
+  <div class="ov"><label><input type="checkbox" id="qtWinds"> Winds aloft</label>
+    <div id="windKey" class="windkey" hidden>34,000 ft, kt:
+      <span style="color:#7f93a3">&lt;60</span> <span style="color:#5fd1c1">60+</span> <span style="color:#f7c948">90+</span> <span style="color:#ff8a3d">120+</span> <span style="color:#ff4d4d">150+</span></div></div>
+  <div class="ov">
+    <label><input type="checkbox" id="ovGairmet"> G-AIRMETs</label>
+    <div class="chips" id="keyGairmet"></div><div class="chips"><span class="ovinfo" id="infoGairmet"></span></div>
+  </div>
+  <div class="ov">
+    <label><input type="checkbox" id="ovIsigmet"> SIGMETs</label>
+    <div class="chips" id="keyIsigmet"></div><div class="chips"><span class="ovinfo" id="infoIsigmet"></span></div>
+  </div>
 
+  </div>
 <div class="panel" id="legend">
   <div><span class="sw" style="background:var(--extm)"></span>Extreme</div>
   <div><span class="sw" style="background:var(--sev)"></span>Severe</div>
@@ -222,11 +273,11 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
     <h4>My flight</h4>
     <p>Type your airports in order, including layovers (for example <b>JFK ORD DEN</b>), or your flight numbers (for example <b>DL1234 DL567</b>), then tap Show. The map draws the most direct path between each pair of airports and highlights the reports, G-AIRMETs and SIGMETs within the distance you choose. Real flights often stray from the direct path to avoid weather or follow airways, so treat it as a guide. Flight-number lookups use a free community database, so check that the airports match your booking.</p>
     <h4>Overlays</h4>
-    <p><b>G-AIRMETs</b> (dashed shapes) are forecasts for the US of where moderate turbulence, icing, low clouds and strong winds are expected. <b>SIGMETs</b> (solid shapes) are warnings of more serious hazards: severe turbulence, thunderstorms, icing, volcanic ash. The international ones cover oceans and other countries.</p>
+    <p><b>G-AIRMETs</b> (dashed shapes) are forecasts for the US of where moderate turbulence, icing, low clouds and strong winds are expected. <b>SIGMETs</b> (solid shapes) are warnings of more serious hazards: severe turbulence, thunderstorms, icing, volcanic ash. The SIGMET layer shows the international ones, which cover oceans and other countries.</p>
     <h4>Radar and winds aloft</h4>
-    <p>The checkboxes on the map itself add <b>radar</b> (rain and storms from NOAA's quality-controlled radar mosaic, which filters out birds, bugs and ground clutter; refreshed every 5 minutes) and <b>winds aloft</b> (forecast jet-stream winds around 34,000 ft, where airliners cruise). Turbulence is more common near storms and along the edges of a strong jet stream, so these help explain the reports.</p>
+    <p>The <b>Layers</b> box on the map adds <b>radar</b> (rain and storms from NOAA's quality-controlled radar mosaic, which filters out birds, bugs and ground clutter; refreshed every 5 minutes) and <b>winds aloft</b> (forecast jet-stream winds around 34,000 ft, where airliners cruise). Turbulence is more common near storms and along the edges of a strong jet stream, so these help explain the reports.</p>
     <h4>Where the data comes from</h4>
-    <p>NOAA's Aviation Weather Center; radar from NOAA's MRMS mosaic; winds from the GFS model via <a href="https://open-meteo.com/" style="color:var(--accent)">Open-Meteo</a> (CC BY 4.0). The map refreshes every few minutes and shows how old its data is. It's for curiosity and context, not flight planning.</p>
+    <p>NOAA's Aviation Weather Center; radar from NOAA's MRMS mosaic; winds from the GFS model via <a href="https://open-meteo.com/" style="color:var(--accent)">Open-Meteo</a> (CC BY 4.0). The map refreshes itself every few minutes. The pill at the top says how old the newest data is (green is fresh, amber is getting old, red means the feed has stalled), and you can tap it to refresh right away. It's for curiosity and context, not flight planning.</p>
   </div>
 </div>
 
@@ -422,7 +473,8 @@ const $ = id => document.getElementById(id);
 function altLabel(){
   let a = +$("altMin").value, b = +$("altMax").value;
   if(a > b) [a,b] = [b,a];
-  $("altLbl").textContent = `${a===0?"Surface":feet(a)} to ${b>=450?"45,000+ ft":feet(b)}`;
+  $("altLbl").textContent = a===0 && b>=450 ? "All altitudes" : `${a===0?"Ground":feet(a)} to ${b>=450?"45,000+ ft":feet(b)}`;
+  $("altFill").style.left = `${a/450*100}%`; $("altFill").style.right = `${100-b/450*100}%`;
   return [a,b];
 }
 
@@ -449,7 +501,8 @@ function render(){
     m.bindTooltip(`${LEVELS[r.rank].label} · ${feet(r.fl)}`, {direction:"top", offset:[0,-4]});
     layer.addLayer(m);
   }
-  $("counts").innerHTML = `${shown} shown of ${reports.length} turbulence reports`;
+  $("counts").innerHTML = `${shown} of ${reports.length} reports shown${truncated ? " · a few may be missing (feed limit)" : ""}`;
+  filterDot();
   if(typeof routeSummary === "function" && route) routeSummary();
   status();
 }
@@ -491,13 +544,16 @@ function popup(r){
 }
 
 function status(){
+  const pill = $("fresh");
+  if(loading && !lastFetch){ $("freshTxt").textContent = "Loading…"; return; }
+  if(loadFailed && !lastFetch){ pill.className = "old"; $("freshTxt").textContent = "Couldn't load · tap to retry"; return; }
   if(!lastFetch) return;
-  const next = $("auto").checked && timer ? ` · next in ${Math.max(0,Math.round((lastFetch.getTime()+REFRESH_MS-Date.now())/60000))} min` : "";
   const asOf = dataAsOf || lastFetch;
   const mins = Math.max(0, Math.round((Date.now()-asOf)/60000));
-  const shown = layer.getLayers().length;
-  $("status").innerHTML = `Data as of <b>${asOf.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}</b> (${mins} min old)${next}<br>via ${esc(source)}${truncated?"<br>Some regions hit AWC's 400-report limit, so a few reports may be missing.":""}`;
-  if(!route) $("mini").textContent = `${shown} reports · data ${mins} min old`;
+  const word = mins < 1 ? "just now" : mins < 90 ? `${mins} min ago` : `${Math.round(mins/60)} hr ago`;
+  pill.className = mins < 20 ? "ok" : mins < 45 ? "stale" : "old";
+  $("freshTxt").textContent = loading ? "Updating…" : `Updated ${word}`;
+  pill.title = `Newest data from ${asOf.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})} via ${source}. Tap to refresh.`;
 }
 
 // Data sources, in order:
@@ -525,10 +581,10 @@ async function getJSON(age){
   throw lastErr;
 }
 
-let dataAsOf = null, truncated = false;
+let dataAsOf = null, truncated = false, loading = false, loadFailed = false;
 async function load(){
   $("err").style.display = "none";
-  if(!lastFetch) $("status").textContent = "Loading…";
+  loading = true; status();
   try{
     const age = +$("age").value;
     const {name, data} = await getJSON(age);
@@ -549,9 +605,10 @@ async function load(){
         urgent: /UUA|URGENT/i.test(p.pirepType||"") || /^\S+\s+UUA/.test(p.rawOb||"")});
     }
     source = name === "snapshot" ? "NOAA AWC (hosted snapshot)" : name; lastFetch = new Date();
+    loading = false; loadFailed = false;
     render();
   }catch(e){
-    $("status").textContent = "Couldn't load reports.";
+    loading = false; loadFailed = true; status();
     const e2 = $("err");
     e2.style.display = "block";
     e2.innerHTML = location.protocol.startsWith("http")
@@ -879,7 +936,7 @@ function drawRoute(){
 
 function routeSummary(){
   const box = $("routeSum");
-  if(!route){ box.innerHTML = ""; return; }
+  if(!route){ box.innerHTML = ""; $("routeChip").hidden = true; return; }
   const minInt = +$("minInt").value;
   const html = route.legs.map((leg, i) => {
     const near = reports.filter(r => r.rank >= Math.max(minInt, 1) && legOf(r.lat, r.lon) === i);
@@ -909,10 +966,11 @@ function routeSummary(){
   box.querySelectorAll("button.link").forEach(b => b.onclick = () => {
     const lat = +b.dataset.lat, lon = +b.dataset.lon;
     layer.eachLayer(m => { const ll = m.getLatLng(); if(ll.lat === lat && ll.lng === lon){ map.setView(ll, Math.max(map.getZoom(), 6)); m.openPopup(); } });
-    if(matchMedia("(max-width:600px)").matches){ $("ctl").classList.add("collapsed"); $("toggle").textContent = "Filters"; }
+    if(isPhone()) openPanel(null);
   });
   const total = reports.filter(r => r.rank >= Math.max(minInt,1) && nearRoute(r.lat, r.lon)).length;
-  $("mini").textContent = `${route.airports.map(airportLabel).join(" → ")} · ${total} bumpy report${total===1?"":"s"} nearby`;
+  $("routeChip").hidden = false;
+  $("routeChip").textContent = `${route.airports.map(airportLabel).join(" → ")}: ${total} bumpy report${total===1?"":"s"} nearby`;
 }
 
 async function setRoute(text, {fit = true} = {}){
@@ -1149,19 +1207,6 @@ async function loadWinds(){
   }catch(e){ $("windKey").hidden = false; $("windKey").textContent = "Winds unavailable right now"; }
 }
 
-const QuickToggles = L.Control.extend({
-  options: {position: "topright"},
-  onAdd(){
-    const d = L.DomUtil.create("div", "quick");
-    d.innerHTML = `<label><input type="checkbox" id="qtRadar"> Radar</label>
-      <label><input type="checkbox" id="qtWinds"> Winds aloft</label>
-      <div id="windKey" class="windkey" hidden>34,000 ft, kt:
-        <span style="color:#7f93a3">&lt;60</span> <span style="color:#5fd1c1">60+</span> <span style="color:#f7c948">90+</span> <span style="color:#ff8a3d">120+</span> <span style="color:#ff4d4d">150+</span></div>`;
-    L.DomEvent.disableClickPropagation(d);
-    return d;
-  }
-});
-map.addControl(new QuickToggles());
 function setRadar(){
   const on = $("qtRadar").checked;
   if(on){ refreshRadar(); radarLayer.addTo(map); } else map.removeLayer(radarLayer);
@@ -1183,16 +1228,15 @@ setInterval(() => { if($("qtRadar").checked) refreshRadar(); if($("qtWinds").che
 
 function schedule(){
   clearInterval(timer); timer = null;
-  if($("auto").checked) timer = setInterval(() => { load(); loadOverlays(); }, REFRESH_MS);
+  timer = setInterval(() => { load(); loadOverlays(); }, REFRESH_MS);
   status();
 }
 
 $("age").onchange = load;
 $("minInt").onchange = render;
 $("acSize").onchange = render;
-$("altMin").oninput = $("altMax").oninput = render;
-$("refresh").onclick = () => { load(); loadOverlays(); schedule(); };
-$("auto").onchange = schedule;
+$("altMin").oninput = $("altMax").oninput = e => { altClamp(e.target); render(); };
+$("fresh").onclick = () => { load(); loadOverlays(); schedule(); };
 setInterval(status, 30000);
 const openHelp = () => { $("help").hidden = false; };
 const closeHelp = () => { $("help").hidden = true; };
@@ -1201,13 +1245,42 @@ $("helpClose").onclick = closeHelp;
 $("help").onclick = e => { if(e.target.id === "help") closeHelp(); };
 document.addEventListener("keydown", e => { if(e.key === "Escape") closeHelp(); });
 try{ if(!localStorage.getItem("seenHelp")){ localStorage.setItem("seenHelp","1"); openHelp(); } }catch(e){}
-$("toggle").onclick = () => {
-  const c = $("ctl").classList.toggle("collapsed");
-  $("toggle").setAttribute("aria-expanded", String(!c));
-  $("toggle").textContent = c ? "Filters" : "Hide";
+// ---------- the two panels: only one open at a time; on a phone they slide up from the bottom ----------
+function isPhone(){ return matchMedia("(max-width:600px)").matches; }
+const PANELS = {pFlight: "btnFlight", pFilters: "btnFilters"};
+function openPanel(id){
+  for(const [p, b] of Object.entries(PANELS)){
+    const on = p === id;
+    $(p).hidden = !on; $(p).style.transform = "";
+    $(b).setAttribute("aria-expanded", String(on));
+  }
+}
+for(const [p, b] of Object.entries(PANELS)){
+  $(b).onclick = () => openPanel($(p).hidden ? p : null);
+  $(p).querySelector(".x").onclick = () => openPanel(null);
+  // swipe down on the panel's header to dismiss it
+  const h = $(p).querySelector(".drawhead"); let y0 = null, dy = 0;
+  h.addEventListener("touchstart", e => { y0 = e.touches[0].clientY; dy = 0; $(p).style.transition = "none"; }, {passive: true});
+  h.addEventListener("touchmove", e => { if(y0 == null) return; dy = Math.max(0, e.touches[0].clientY - y0); $(p).style.transform = `translateY(${dy}px)`; }, {passive: true});
+  h.addEventListener("touchend", () => { $(p).style.transition = ""; if(dy > 70) openPanel(null); else $(p).style.transform = ""; y0 = null; });
+}
+// ---------- filters: dot on the button when anything differs from the defaults ----------
+const FILTER_DEFAULTS = {age: "2", minInt: "1", acSize: "all", altMin: "0", altMax: "450"};
+function filterDot(){
+  const changed = Object.entries(FILTER_DEFAULTS).some(([id, v]) => $(id).value !== v);
+  $("filtDot").hidden = !changed; $("resetF").hidden = !changed;
+}
+$("resetF").onclick = () => {
+  const ageChanged = $("age").value !== FILTER_DEFAULTS.age;
+  for(const [id, v] of Object.entries(FILTER_DEFAULTS)) $(id).value = v;
+  ageChanged ? load() : render();
 };
-if(matchMedia("(max-width:600px)").matches){ $("ctl").classList.add("collapsed"); }
-else { $("toggle").textContent = "Hide"; }
+// two-handle altitude slider: keep the handles from crossing, and keep the one you can grab on top
+function altClamp(moved){
+  const a = $("altMin"), b = $("altMax");
+  if(+a.value > +b.value - 10){ if(moved === a) a.value = +b.value - 10; else b.value = +a.value + 10; }
+  a.style.zIndex = +a.value > 400 ? 3 : 1; b.style.zIndex = 2;
+}
 altLabel(); load(); schedule();
 Object.keys(overlays).forEach(setOverlay);
 { // restore a route from the link (#route=JFK-DEN) or from last time
