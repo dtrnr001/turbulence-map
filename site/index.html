@@ -66,7 +66,7 @@ button:hover{border-color:var(--accent)}
 .quick input{width:16px;height:16px;margin:0}
 .windkey{font-size:10px;color:var(--muted);max-width:120px;line-height:1.35}
 .windkey[hidden]{display:none}
-.windarrow{background:none;border:none}
+.windcanvas{position:absolute;left:0;top:0;pointer-events:none}
 #routeIn{flex:1;min-width:0;background:#0f1418;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;text-transform:uppercase}
 #routeIn::placeholder{text-transform:none;color:#6c7b86}
 select.inline{width:auto;padding:1px 2px;font-size:12px}
@@ -951,7 +951,7 @@ const radarLayer = L.tileLayer("https://mesonet.agron.iastate.edu/cache/tile.py/
   attribution: 'Radar: NWS NEXRAD via <a href="https://mesonet.agron.iastate.edu/">Iowa Env. Mesonet</a>'
 });
 map.createPane("winds").style.zIndex = 360;
-const windLayer = L.layerGroup();
+map.getPane("winds").style.pointerEvents = "none";
 let windData = null;
 
 const windColor = kt => kt >= 150 ? "#ff4d4d" : kt >= 120 ? "#ff8a3d" : kt >= 90 ? "#f7c948" : kt >= 60 ? "#5fd1c1" : "#7f93a3";
@@ -963,30 +963,129 @@ function windIndex(){
   windData.times.forEach((t, i) => { const d = Math.abs(new Date(t + "Z") - now); if(d < bestD){ bestD = d; best = i; } });
   return best;
 }
-function drawWinds(){
-  windLayer.clearLayers();
+
+// Wind at any point, interpolated between the 3-degree grid points (using u/v so directions blend correctly)
+let windGrid = null;
+function buildWindGrid(){
+  windGrid = null;
   const i = windIndex();
   if(i < 0) return;
-  const when = new Date(windData.times[i] + "Z");
-  const sparse = map.getZoom() <= 3; // zoomed out: every other grid point, so arrows don't crowd
-  for(const [lat, lon, spds, dirs] of windData.points){
-    const kt = spds[i], from = dirs[i];
-    if(kt == null || from == null) continue;
-    if(sparse && ((lat - 24) % 6 || (lon + 126) % 6)) continue;
-    const c = windColor(kt), len = Math.min(sparse ? 30 : 34, 12 + kt / 6), w = kt >= 90 ? 3 : 2, op = kt < 60 ? .45 : 1;
-    // arrow points the way the wind blows (opposite of the "from" direction)
-    const svg = `<svg width="40" height="40" viewBox="-20 -20 40 40" style="transform:rotate(${from + 180}deg);opacity:${op}">
-      <line x1="0" y1="${len/2}" x2="0" y2="${-len/2}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>
-      <path d="M-4,${-len/2 + 5} L0,${-len/2} L4,${-len/2 + 5}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    L.marker([lat, lon], {pane: "winds", icon: L.divIcon({className: "windarrow", html: svg, iconSize: [40, 40], iconAnchor: [20, 20]}), keyboard: false})
-      .bindPopup(`<div class="pop"><div class="urgent" style="color:${c}">Jet-stream wind forecast</div>
-        <h3>${Math.round(kt)} kt (${Math.round(kt * 1.151)} mph) from the ${compassWord(from)}</h3>
-        <div class="meta">around 34,000 ft · ${esc(localTime(when))}</div>
-        <p class="feel">${kt >= 120 ? "A strong jet stream. Clear-air turbulence is more likely near its edges, especially where the wind changes quickly." : kt >= 90 ? "A fairly strong jet stream. Turbulence is possible near its edges." : "Ordinary winds at this altitude."}</p>
-        <p class="note">GFS forecast via Open-Meteo.</p></div>`, {maxWidth: 300})
-      .addTo(windLayer);
+  const pts = windData.points, lats = [...new Set(pts.map(p => p[0]))].sort((a,b) => a-b), lons = [...new Set(pts.map(p => p[1]))].sort((a,b) => a-b);
+  const idx = new Map(pts.map(p => [p[0] + "," + p[1], p]));
+  const u = [], v = [];
+  for(const la of lats){
+    const ur = [], vr = [];
+    for(const lo of lons){
+      const p = idx.get(la + "," + lo), kt = p && p[2][i], from = p && p[3][i];
+      if(kt == null || from == null){ ur.push(NaN); vr.push(NaN); continue; }
+      const to = (from + 180) * Math.PI / 180;   // direction the wind blows toward
+      ur.push(kt * Math.sin(to)); vr.push(kt * Math.cos(to));
+    }
+    u.push(ur); v.push(vr);
   }
+  windGrid = {lats, lons, u, v, step: lats[1] - lats[0], when: new Date(windData.times[i] + "Z")};
 }
+function windAt(lat, lon){
+  const g = windGrid; if(!g) return null;
+  const fy = (lat - g.lats[0]) / g.step, fx = (lon - g.lons[0]) / g.step;
+  if(fy < 0 || fx < 0 || fy > g.lats.length-1 || fx > g.lons.length-1) return null;
+  const y0 = Math.min(Math.floor(fy), g.lats.length-2), x0 = Math.min(Math.floor(fx), g.lons.length-2), ty = fy - y0, tx = fx - x0;
+  const lerp = A => (A[y0][x0]*(1-tx) + A[y0][x0+1]*tx)*(1-ty) + (A[y0+1][x0]*(1-tx) + A[y0+1][x0+1]*tx)*ty;
+  const uu = lerp(g.u), vv = lerp(g.v);
+  if(isNaN(uu) || isNaN(vv)) return null;
+  const kt = Math.hypot(uu, vv), toDeg = (Math.atan2(uu, vv) * 180 / Math.PI + 360) % 360;
+  return {kt, to: toDeg, from: (toDeg + 180) % 360};
+}
+
+// Small arrows drawn on one canvas, with a gentle downwind "gust" ripple.
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const WindCanvas = L.Layer.extend({
+  onAdd(m){
+    this._c = L.DomUtil.create("canvas", "windcanvas", m.getPane("winds"));
+    m.on("moveend zoomend resize", this._reset, this);
+    m.on("zoomstart", this._hide, this);
+    this._reset();
+  },
+  onRemove(m){
+    cancelAnimationFrame(this._raf); this._raf = null;
+    m.off("moveend zoomend resize", this._reset, this); m.off("zoomstart", this._hide, this);
+    this._c.remove(); this._c = null;
+  },
+  _hide(){ if(this._c) this._c.style.visibility = "hidden"; },
+  _reset(){
+    if(!this._c) return;
+    const m = this._map, size = m.getSize(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const c = this._c;
+    c.width = size.x * dpr; c.height = size.y * dpr; c.style.width = size.x + "px"; c.style.height = size.y + "px";
+    L.DomUtil.setPosition(c, m.containerPointToLayerPoint([0, 0]));
+    c.style.visibility = "visible";
+    this._dpr = dpr;
+    const SP = 20; // pixels between arrows
+    this._arrows = [];
+    for(let row = 0, y = SP/2; y < size.y; y += SP, row++){
+      for(let x = SP/2 + (row % 2 ? SP/2 : 0); x < size.x; x += SP){ // staggered rows look less like a grid
+        const ll = m.containerPointToLatLng([x, y]);
+        const w = windAt(ll.lat, ((ll.lng + 180) % 360 + 360) % 360 - 180);
+        if(!w) continue;
+        const a = w.to * Math.PI / 180;
+        this._arrows.push({x, y, dx: Math.sin(a), dy: -Math.cos(a), kt: w.kt, len: Math.min(16, 6 + w.kt / 14), col: windColor(w.kt), alpha: w.kt < 60 ? .5 : .95});
+      }
+    }
+    this._draw(performance.now());
+    if(!reduceMotion.matches && !this._raf) this._loop();
+  },
+  _loop(){
+    let last = 0;
+    const tick = t => {
+      this._raf = requestAnimationFrame(tick);
+      if(t - last < 50) return; // about 20 frames a second is plenty
+      last = t; this._draw(t);
+    };
+    this._raf = requestAnimationFrame(tick); // the browser pauses this when the tab is hidden
+  },
+  _draw(t){
+    const c = this._c; if(!c) return;
+    const ctx = c.getContext("2d"), s = this._dpr;
+    ctx.setTransform(s, 0, 0, s, 0, 0);
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    const still = reduceMotion.matches, sec = t / 1000;
+    for(const a of this._arrows){
+      // a ripple that travels downwind, faster and stronger in stronger wind
+      const along = a.x * a.dx + a.y * a.dy;
+      const amp = still ? 0 : 1 + a.kt / 70, wob = Math.sin(sec * (2 + a.kt / 40) - along / 35);
+      const ox = a.x + a.dx * amp * wob, oy = a.y + a.dy * amp * wob;
+      const hx = ox + a.dx * a.len / 2, hy = oy + a.dy * a.len / 2, tx = ox - a.dx * a.len / 2, ty = oy - a.dy * a.len / 2;
+      ctx.globalAlpha = a.alpha; ctx.strokeStyle = a.col; ctx.lineWidth = a.kt >= 90 ? 1.8 : 1.4;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy);
+      // arrowhead
+      const hl = Math.min(4.5, a.len * .4), px = -a.dy, py = a.dx;
+      ctx.moveTo(hx - a.dx * hl + px * hl * .6, hy - a.dy * hl + py * hl * .6); ctx.lineTo(hx, hy); ctx.lineTo(hx - a.dx * hl - px * hl * .6, hy - a.dy * hl - py * hl * .6);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  },
+});
+const windLayer = new WindCanvas();
+function drawWinds(){ buildWindGrid(); if(map.hasLayer(windLayer)) windLayer._reset(); }
+
+// Tap on empty map while winds are on: show the wind there
+function windPopupHtml(w){
+  const c = windColor(w.kt), kt = w.kt;
+  return `<div class="pop"><div class="urgent" style="color:${c}">Jet-stream wind forecast</div>
+    <h3>${Math.round(kt)} kt (${Math.round(kt * 1.151)} mph) from the ${compassWord(w.from)}</h3>
+    <div class="meta">around 34,000 ft · ${esc(localTime(windGrid.when))}</div>
+    <p class="feel">${kt >= 120 ? "A strong jet stream. Clear-air turbulence is more likely near its edges, especially where the wind changes quickly." : kt >= 90 ? "A fairly strong jet stream. Turbulence is possible near its edges." : "Ordinary winds at this altitude."}</p>
+    <p class="note">GFS forecast via Open-Meteo.</p></div>`;
+}
+map.on("click", e => {
+  if(!$("qtWinds").checked || !windGrid) return;
+  const tgt = e.originalEvent && e.originalEvent.target;
+  if(tgt && tgt.closest && tgt.closest(".leaflet-interactive")) return; // a report or hazard shape was tapped
+  const w = windAt(e.latlng.lat, e.latlng.lng);
+  if(w) L.popup({maxWidth: 300}).setLatLng(e.latlng).setContent(windPopupHtml(w)).openOn(map);
+});
+
 async function loadWinds(){
   try{
     const res = await fetch(`winds.json?t=${Date.now()}`, {cache: "no-store"});
@@ -1010,7 +1109,6 @@ const QuickToggles = L.Control.extend({
   }
 });
 map.addControl(new QuickToggles());
-map.on("zoomend", () => { if($("qtWinds").checked) drawWinds(); });
 function setRadar(){
   const on = $("qtRadar").checked;
   if(on){ radarLayer.redraw(); radarLayer.addTo(map); } else map.removeLayer(radarLayer);
