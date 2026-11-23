@@ -61,6 +61,12 @@ button:hover{border-color:var(--accent)}
 .pop summary{cursor:pointer;color:var(--accent);font-size:12px}
 .pop details table{margin-top:6px;font-size:12px}
 .btns{display:flex;gap:6px;flex:none}
+.quick{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 9px;color:var(--text);font:13px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;gap:4px}
+.quick label{display:flex;gap:6px;align-items:center;cursor:pointer;white-space:nowrap}
+.quick input{width:16px;height:16px;margin:0}
+.windkey{font-size:10px;color:var(--muted);max-width:120px;line-height:1.35}
+.windkey[hidden]{display:none}
+.windarrow{background:none;border:none}
 #routeIn{flex:1;min-width:0;background:#0f1418;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;text-transform:uppercase}
 #routeIn::placeholder{text-transform:none;color:#6c7b86}
 select.inline{width:auto;padding:1px 2px;font-size:12px}
@@ -92,6 +98,8 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   #ctl .sub{margin-bottom:0}
   #toggle{display:block;padding:8px 12px}
   #helpBtn{width:38px;height:38px}
+  .quick{font-size:13px;padding:6px 8px}
+  .quick input{width:18px;height:18px}
   .sheet{align-items:flex-end;padding:0}
   .sheet-card{border-radius:14px 14px 0 0;max-height:88vh;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
   #ctl.collapsed #body{display:none}
@@ -215,8 +223,10 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
     <p>Type your airports in order, including layovers (for example <b>JFK ORD DEN</b>), or your flight numbers (for example <b>DL1234 DL567</b>), then tap Show. The map draws the most direct path between each pair of airports and highlights the reports, G-AIRMETs and SIGMETs within the distance you choose. Real flights often stray from the direct path to avoid weather or follow airways, so treat it as a guide. Flight-number lookups use a free community database, so check that the airports match your booking.</p>
     <h4>Overlays</h4>
     <p><b>G-AIRMETs</b> (dashed shapes) are forecasts for the US of where moderate turbulence, icing, low clouds and strong winds are expected. <b>SIGMETs</b> (solid shapes) are warnings of more serious hazards: severe turbulence, thunderstorms, icing, volcanic ash. The international ones cover oceans and other countries.</p>
+    <h4>Radar and winds aloft</h4>
+    <p>The checkboxes on the map itself add <b>radar</b> (rain and storms from NWS weather radar, updated every 5 minutes) and <b>winds aloft</b> (forecast jet-stream winds around 34,000 ft, where airliners cruise). Turbulence is more common near storms and along the edges of a strong jet stream, so these help explain the reports.</p>
     <h4>Where the data comes from</h4>
-    <p>NOAA's Aviation Weather Center. The map refreshes every few minutes and shows how old its data is. It's for curiosity and context, not flight planning.</p>
+    <p>NOAA's Aviation Weather Center; radar from the National Weather Service via the Iowa Environmental Mesonet; winds from the GFS model via <a href="https://open-meteo.com/" style="color:var(--accent)">Open-Meteo</a> (CC BY 4.0). The map refreshes every few minutes and shows how old its data is. It's for curiosity and context, not flight planning.</p>
   </div>
 </div>
 
@@ -932,6 +942,93 @@ function clearRoute(){
 $("routeForm").onsubmit = e => { e.preventDefault(); $("routeIn").blur(); setRoute($("routeIn").value); };
 $("routeClear").onclick = clearRoute;
 $("corridor").onchange = () => { if(route){ render(); Object.keys(overlays).forEach(drawOverlay); routeSummary(); } };
+
+
+// ---------- quick toggles on the map: radar and jet-stream winds ----------
+map.createPane("radar").style.zIndex = 320;
+const radarLayer = L.tileLayer("https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png?_={t}", {
+  pane: "radar", opacity: .65, maxZoom: 10, t: () => Math.floor(Date.now() / 300000),
+  attribution: 'Radar: NWS NEXRAD via <a href="https://mesonet.agron.iastate.edu/">Iowa Env. Mesonet</a>'
+});
+map.createPane("winds").style.zIndex = 360;
+const windLayer = L.layerGroup();
+let windData = null;
+
+const windColor = kt => kt >= 150 ? "#ff4d4d" : kt >= 120 ? "#ff8a3d" : kt >= 90 ? "#f7c948" : kt >= 60 ? "#5fd1c1" : "#7f93a3";
+function compassWord(deg){ return ["north","northeast","east","southeast","south","southwest","west","northwest"][Math.round(((deg % 360) + 360) % 360 / 45) % 8]; }
+function windIndex(){
+  if(!windData || !windData.times) return -1;
+  const now = Date.now();
+  let best = -1, bestD = Infinity;
+  windData.times.forEach((t, i) => { const d = Math.abs(new Date(t + "Z") - now); if(d < bestD){ bestD = d; best = i; } });
+  return best;
+}
+function drawWinds(){
+  windLayer.clearLayers();
+  const i = windIndex();
+  if(i < 0) return;
+  const when = new Date(windData.times[i] + "Z");
+  const sparse = map.getZoom() <= 3; // zoomed out: every other grid point, so arrows don't crowd
+  for(const [lat, lon, spds, dirs] of windData.points){
+    const kt = spds[i], from = dirs[i];
+    if(kt == null || from == null) continue;
+    if(sparse && ((lat - 24) % 6 || (lon + 126) % 6)) continue;
+    const c = windColor(kt), len = Math.min(sparse ? 30 : 34, 12 + kt / 6), w = kt >= 90 ? 3 : 2, op = kt < 60 ? .45 : 1;
+    // arrow points the way the wind blows (opposite of the "from" direction)
+    const svg = `<svg width="40" height="40" viewBox="-20 -20 40 40" style="transform:rotate(${from + 180}deg);opacity:${op}">
+      <line x1="0" y1="${len/2}" x2="0" y2="${-len/2}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>
+      <path d="M-4,${-len/2 + 5} L0,${-len/2} L4,${-len/2 + 5}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    L.marker([lat, lon], {pane: "winds", icon: L.divIcon({className: "windarrow", html: svg, iconSize: [40, 40], iconAnchor: [20, 20]}), keyboard: false})
+      .bindPopup(`<div class="pop"><div class="urgent" style="color:${c}">Jet-stream wind forecast</div>
+        <h3>${Math.round(kt)} kt (${Math.round(kt * 1.151)} mph) from the ${compassWord(from)}</h3>
+        <div class="meta">around 34,000 ft · ${esc(localTime(when))}</div>
+        <p class="feel">${kt >= 120 ? "A strong jet stream. Clear-air turbulence is more likely near its edges, especially where the wind changes quickly." : kt >= 90 ? "A fairly strong jet stream. Turbulence is possible near its edges." : "Ordinary winds at this altitude."}</p>
+        <p class="note">GFS forecast via Open-Meteo.</p></div>`, {maxWidth: 300})
+      .addTo(windLayer);
+  }
+}
+async function loadWinds(){
+  try{
+    const res = await fetch(`winds.json?t=${Date.now()}`, {cache: "no-store"});
+    if(!res.ok) throw new Error(res.status);
+    windData = await res.json();
+    drawWinds();
+    $("windKey").hidden = !$("qtWinds").checked;
+  }catch(e){ $("windKey").hidden = false; $("windKey").textContent = "Winds unavailable right now"; }
+}
+
+const QuickToggles = L.Control.extend({
+  options: {position: "topright"},
+  onAdd(){
+    const d = L.DomUtil.create("div", "quick");
+    d.innerHTML = `<label><input type="checkbox" id="qtRadar"> Radar</label>
+      <label><input type="checkbox" id="qtWinds"> Winds aloft</label>
+      <div id="windKey" class="windkey" hidden>34,000 ft, kt:
+        <span style="color:#7f93a3">&lt;60</span> <span style="color:#5fd1c1">60+</span> <span style="color:#f7c948">90+</span> <span style="color:#ff8a3d">120+</span> <span style="color:#ff4d4d">150+</span></div>`;
+    L.DomEvent.disableClickPropagation(d);
+    return d;
+  }
+});
+map.addControl(new QuickToggles());
+map.on("zoomend", () => { if($("qtWinds").checked) drawWinds(); });
+function setRadar(){
+  const on = $("qtRadar").checked;
+  if(on){ radarLayer.redraw(); radarLayer.addTo(map); } else map.removeLayer(radarLayer);
+  try{ localStorage.setItem("qt_radar", on ? "1" : "0"); }catch(e){}
+}
+function setWinds(){
+  const on = $("qtWinds").checked;
+  const credit = 'Winds: <a href="https://open-meteo.com/">Open-Meteo</a> (GFS)';
+  if(on){ windLayer.addTo(map); loadWinds(); map.attributionControl.addAttribution(credit); }
+  else { map.removeLayer(windLayer); $("windKey").hidden = true; map.attributionControl.removeAttribution(credit); }
+  try{ localStorage.setItem("qt_winds", on ? "1" : "0"); }catch(e){}
+}
+try{ $("qtRadar").checked = localStorage.getItem("qt_radar") === "1"; $("qtWinds").checked = localStorage.getItem("qt_winds") === "1"; }catch(e){}
+$("qtRadar").onchange = setRadar;
+$("qtWinds").onchange = setWinds;
+setRadar(); setWinds();
+// radar tiles change every 5 minutes; winds every few hours
+setInterval(() => { if($("qtRadar").checked) radarLayer.redraw(); if($("qtWinds").checked) loadWinds(); }, 5 * 60 * 1000);
 
 function schedule(){
   clearInterval(timer); timer = null;

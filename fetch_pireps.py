@@ -5,7 +5,7 @@ NOAA AWC and write site/pirep.json, site/gairmet.json and site/isigmet.json.
 Run by the GitHub Actions workflow every few minutes. AWC returns at most
 400 reports per request, so the US area is split into boxes and merged.
 """
-import json, sys, time, urllib.request, urllib.error
+import json, sys, time, urllib.request, urllib.error, urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -75,6 +75,55 @@ def write_overlays(site):
         time.sleep(1)
 
 
+WINDS_MAX_AGE_H = 3
+LIVE_WINDS = "https://dtrnr001.github.io/turbulence-map/winds.json"
+
+
+def write_winds(site):
+    """Jet-stream level (250 hPa, about 34,000 ft) winds on a 3-degree grid from
+    Open-Meteo (free, non-commercial, CC BY 4.0). Refetched only every few hours
+    to stay well inside the free daily limit; otherwise the live copy is reused."""
+    out = site / "winds.json"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(LIVE_WINDS, headers={"User-Agent": UA}), timeout=20) as r:
+            prev = json.loads(r.read())
+        age_h = (datetime.now(timezone.utc) - datetime.fromisoformat(prev["fetchedAt"])).total_seconds() / 3600
+        if age_h < WINDS_MAX_AGE_H:
+            out.write_text(json.dumps(prev, separators=(",", ":")))
+            print(f"reused winds from {age_h:.1f} h ago")
+            return
+    except Exception as e:
+        print(f"no reusable winds ({e})")
+    grid = [(lat, lon) for lat in range(24, 52, 3) for lon in range(-126, -64, 3)]
+    points, times = [], None
+    for i in range(0, len(grid), 60):
+        chunk = grid[i:i + 60]
+        q = urllib.parse.urlencode({
+            "latitude": ",".join(str(a) for a, _ in chunk), "longitude": ",".join(str(b) for _, b in chunk),
+            "hourly": "wind_speed_250hPa,wind_direction_250hPa", "wind_speed_unit": "kn",
+            "forecast_days": 2, "timezone": "UTC",
+        })
+        try:
+            req = urllib.request.Request(f"https://api.open-meteo.com/v1/gfs?{q}", headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=40) as r:
+                rows = json.loads(r.read())
+        except Exception as e:
+            print(f"winds chunk failed: {e}", file=sys.stderr)
+            return  # keep the site working without winds rather than publish a partial grid
+        rows = rows if isinstance(rows, list) else [rows]
+        for (lat, lon), row in zip(chunk, rows):
+            h = row["hourly"]
+            times = times or h["time"]
+            points.append([lat, lon, h["wind_speed_250hPa"], h["wind_direction_250hPa"]])
+        time.sleep(1)
+    out.write_text(json.dumps({
+        "fetchedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "level": "250 hPa (about 34,000 ft)", "model": "GFS via Open-Meteo",
+        "times": times, "points": points,
+    }, separators=(",", ":")))
+    print(f"wrote winds for {len(points)} grid points")
+
+
 def main(out):
     seen, reports, truncated, failures = set(), [], False, 0
     for box in BOXES:
@@ -107,6 +156,7 @@ def main(out):
         print("sample report:", json.dumps(reports[0])[:1500])
     print(f"wrote {len(reports)} reports to {out} (truncated={truncated}, failed boxes={failures})")
     write_overlays(out.parent)
+    write_winds(out.parent)
 
 
 if __name__ == "__main__":
