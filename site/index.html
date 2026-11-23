@@ -61,6 +61,18 @@ button:hover{border-color:var(--accent)}
 .pop summary{cursor:pointer;color:var(--accent);font-size:12px}
 .pop details table{margin-top:6px;font-size:12px}
 .btns{display:flex;gap:6px;flex:none}
+#routeIn{flex:1;min-width:0;background:#0f1418;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;text-transform:uppercase}
+#routeIn::placeholder{text-transform:none;color:#6c7b86}
+select.inline{width:auto;padding:1px 2px;font-size:12px}
+.small{font-size:11px}
+#routeErr{color:#ff9b9b;font-size:12px;margin-top:4px}
+#routeErr:empty{display:none}
+button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-size:12px;text-align:left;cursor:pointer}
+#routeSum:empty{display:none}
+#routeSum{margin-top:8px;border-top:1px solid var(--line);padding-top:6px;font-size:12px}
+#routeSum .leg{margin:4px 0 8px}
+#routeSum .leghead{font-weight:600;font-size:13px}
+#routeSum .hz{color:#e9d68b;margin-top:2px}
 #helpBtn{width:32px;padding:5px 0;font-weight:700;border-radius:50%}
 .sheet{position:fixed;inset:0;z-index:2000;background:#000a;display:flex;align-items:center;justify-content:center;padding:16px}
 .sheet[hidden]{display:none}
@@ -85,6 +97,9 @@ button:hover{border-color:var(--accent)}
   #ctl.collapsed #body{display:none}
   #body{margin-top:8px}
   select{font-size:16px;padding:8px}
+  #routeIn{font-size:16px;padding:8px}
+  select.inline{font-size:14px;padding:2px}
+  #routeGo{padding:8px 14px}
   input[type=range]{height:28px}
   .row label,.ov > label{font-size:15px}
   .ov input[type=checkbox],.row input[type=checkbox]{width:18px;height:18px}
@@ -104,6 +119,20 @@ button:hover{border-color:var(--accent)}
   <div class="btns"><button id="helpBtn" title="How to read this map" aria-label="Help">?</button>
   <button id="toggle" aria-expanded="true" title="Show or hide filters">Filters</button></div></div>
   <div id="body">
+  <form id="routeForm" autocomplete="off">
+    <label for="routeIn">My flight</label>
+    <div class="row">
+      <input id="routeIn" type="text" inputmode="text" autocapitalize="characters" spellcheck="false" placeholder="JFK DEN SFO, or DL1234">
+      <button id="routeGo" type="submit">Show</button>
+    </div>
+    <div class="row" style="margin-top:4px;justify-content:space-between">
+      <span class="muted small">Airports in order (layovers too), or flight numbers. Within
+        <select id="corridor" class="inline"><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option></select> mi</span>
+      <button id="routeClear" type="button" class="link" hidden>Clear</button>
+    </div>
+    <div id="routeErr"></div>
+  </form>
+  <div id="routeSum"></div>
 
   <label for="age">Time window</label>
   <select id="age">
@@ -182,6 +211,8 @@ button:hover{border-color:var(--accent)}
     <p>How often it happened: <b>occasional</b> is less than a third of the time, <b>intermittent</b> is a third to two thirds, and <b>continuous</b> is most of the time.</p>
     <h4>The aircraft matters</h4>
     <p>The same air feels much rougher in a small plane than in an airliner. Each report says what kind of aircraft reported it, and you can filter by aircraft size.</p>
+    <h4>My flight</h4>
+    <p>Type your airports in order, including layovers (for example <b>JFK ORD DEN</b>), or your flight numbers (for example <b>DL1234 DL567</b>), then tap Show. The map draws the most direct path between each pair of airports and highlights the reports, G-AIRMETs and SIGMETs within the distance you choose. Real flights often stray from the direct path to avoid weather or follow airways, so treat it as a guide. Flight-number lookups use a free community database, so check that the airports match your booking.</p>
     <h4>Overlays</h4>
     <p><b>G-AIRMETs</b> (dashed shapes) are forecasts for the US of where moderate turbulence, icing, low clouds and strong winds are expected. <b>SIGMETs</b> (solid shapes) are warnings of more serious hazards: severe turbulence, thunderstorms, icing, volcanic ash. The international ones cover oceans and other countries.</p>
     <h4>Where the data comes from</h4>
@@ -399,15 +430,17 @@ function render(){
     .sort((x,y) => x.rank - y.rank);
   for(const r of list){
     counts[r.rank]++; shown++;
+    const dim = route && !nearRoute(r.lat, r.lon);
     const m = L.circleMarker([r.lat, r.lon], {
-      radius: 4 + r.rank*1.3, color: r.urgent ? "#fff" : "#000", weight: r.urgent ? 2 : 1,
-      fillColor: color(r.rank), fillOpacity: .9, opacity: .8
+      radius: (4 + r.rank*1.3) * (dim ? .7 : 1), color: r.urgent ? "#fff" : "#000", weight: r.urgent ? 2 : 1,
+      fillColor: color(r.rank), fillOpacity: dim ? .18 : .9, opacity: dim ? .2 : .8
     });
     m.bindPopup(() => popup(r), {maxWidth: 320});
     m.bindTooltip(`${LEVELS[r.rank].label} · ${feet(r.fl)}`, {direction:"top", offset:[0,-4]});
     layer.addLayer(m);
   }
   $("counts").innerHTML = `${shown} shown of ${reports.length} turbulence reports`;
+  if(typeof routeSummary === "function" && route) routeSummary();
   status();
 }
 
@@ -454,7 +487,7 @@ function status(){
   const mins = Math.max(0, Math.round((Date.now()-asOf)/60000));
   const shown = layer.getLayers().length;
   $("status").innerHTML = `Data as of <b>${asOf.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}</b> (${mins} min old)${next}<br>via ${esc(source)}${truncated?"<br>Some regions hit AWC's 400-report limit, so a few reports may be missing.":""}`;
-  $("mini").textContent = `${shown} reports · data ${mins} min old`;
+  if(!route) $("mini").textContent = `${shown} reports · data ${mins} min old`;
 }
 
 // Data sources, in order:
@@ -658,7 +691,8 @@ function drawOverlay(name){
       st = ISIGMET_STYLE[p.hazard] || OTHER; dashed = /F$/.test(p.seriesId||""); weight = dashed ? 1.5 : 2.5; fill = dashed ? .03 : .12;
     }
     used.set(st.label, {c: st.c, dashed: name === "gairmet"});
-    const gj = L.geoJSON(f, {pane: "hazards", style: () => ({color: st.c, weight, opacity: .9, fillColor: st.c, fillOpacity: fill, dashArray: dashed ? "6 5" : null})});
+    const off = route && !legsTouching(f.geometry).length;
+    const gj = L.geoJSON(f, {pane: "hazards", style: () => ({color: st.c, weight, opacity: off ? .25 : .9, fillColor: st.c, fillOpacity: off ? .02 : fill, dashArray: dashed ? "6 5" : null})});
     gj.bindPopup(() => name === "gairmet" ? gairmetPopup(p) : isigmetPopup(p), {maxWidth: 340});
     o.group.addLayer(gj);
   }
@@ -671,15 +705,19 @@ function drawOverlay(name){
   } else $(o.info).textContent = `(${n} worldwide)`;
 }
 
-async function loadOverlay(name){
+async function fetchOverlay(name){
   const o = overlays[name];
-  if(!$(o.box).checked) return;
   try{
     const res = await fetch(`${o.file}?t=${Date.now()}`, {cache:"no-store"});
     if(!res.ok) throw new Error(res.status);
     o.data = await res.json();
   }catch(e){ o.data = {features: [], error: String(e)}; }
+}
+async function loadOverlay(name){
+  if(!$(overlays[name].box).checked && !route) return;
+  await fetchOverlay(name);
   drawOverlay(name);
+  if(route) routeSummary();
 }
 
 function setOverlay(name){
@@ -695,6 +733,205 @@ for(const name of Object.keys(overlays)){
   $(o.box).onchange = () => setOverlay(name);
 }
 const loadOverlays = () => Object.keys(overlays).forEach(loadOverlay);
+
+// ---------- "My flight": route entry, great-circle legs, nearby hazards ----------
+map.createPane("route").style.zIndex = 380;
+const routeLayer = L.layerGroup().addTo(map);
+let route = null;           // {legs:[{from,to,pts}], airports:[...]} or null
+let PLACE_MAP = null;       // code -> {code, name, lat, lon}
+
+const placesReady = fetch("places.json").then(r => r.ok ? r.json() : {}).then(d => {
+  PLACE_MAP = {};
+  for(const [icao, v] of Object.entries(d)){
+    const a = {icao, iata: v[5] || "", name: v[2], st: v[3], lat: v[0], lon: v[1]};
+    PLACE_MAP[icao] = a;
+    if(a.iata && !PLACE_MAP[a.iata]) PLACE_MAP[a.iata] = a;
+  }
+}).catch(() => { PLACE_MAP = {}; });
+
+const R_MI = 3958.8, rad = Math.PI/180;
+function distMi(a, b){
+  const dLat = (b[0]-a[0])*rad, dLon = (b[1]-a[1])*rad;
+  const h = Math.sin(dLat/2)**2 + Math.cos(a[0]*rad)*Math.cos(b[0]*rad)*Math.sin(dLon/2)**2;
+  return 2*R_MI*Math.asin(Math.min(1, Math.sqrt(h)));
+}
+// Points along the great circle, roughly every 10 miles
+function greatCircle(a, b){
+  const d = distMi(a, b) / R_MI, n = Math.max(2, Math.ceil(distMi(a, b) / 10));
+  const [la1, lo1, la2, lo2] = [a[0]*rad, a[1]*rad, b[0]*rad, b[1]*rad];
+  const pts = [];
+  for(let i = 0; i <= n; i++){
+    const f = i/n;
+    if(d === 0){ pts.push([a[0], a[1]]); continue; }
+    const A = Math.sin((1-f)*d)/Math.sin(d), B = Math.sin(f*d)/Math.sin(d);
+    const x = A*Math.cos(la1)*Math.cos(lo1) + B*Math.cos(la2)*Math.cos(lo2);
+    const y = A*Math.cos(la1)*Math.sin(lo1) + B*Math.cos(la2)*Math.sin(lo2);
+    const z = A*Math.sin(la1) + B*Math.sin(la2);
+    pts.push([Math.atan2(z, Math.hypot(x, y))/rad, Math.atan2(y, x)/rad]);
+  }
+  // keep longitudes continuous so legs crossing the date line draw correctly
+  for(let i = 1; i < pts.length; i++){ while(pts[i][1] - pts[i-1][1] > 180) pts[i][1] -= 360; while(pts[i][1] - pts[i-1][1] < -180) pts[i][1] += 360; }
+  return pts;
+}
+const corridorMi = () => +$("corridor").value;
+function nearRoute(lat, lon){
+  if(!route) return false;
+  const c = corridorMi();
+  for(const leg of route.legs){
+    if(lat < leg.box[0]-c/60 || lat > leg.box[2]+c/60) continue;
+    for(const p of leg.pts) if(Math.abs(p[0]-lat) < c/55 && distMi(p, [lat, lon]) <= c) return true;
+  }
+  return false;
+}
+function legOf(lat, lon){
+  const c = corridorMi();
+  return route.legs.findIndex(leg => leg.pts.some(p => Math.abs(p[0]-lat) < c/55 && distMi(p, [lat, lon]) <= c));
+}
+function inRing(pt, ring){ // ring: [[lon,lat],...]
+  let inside = false;
+  for(let i = 0, j = ring.length-1; i < ring.length; j = i++){
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if(((yi > pt[0]) !== (yj > pt[0])) && (pt[1] < (xj-xi)*(pt[0]-yi)/(yj-yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+// Which legs does this GeoJSON shape touch (crosses it, or comes within the corridor)?
+function legsTouching(geom){
+  if(!route || !geom) return [];
+  const polys = geom.type === "Polygon" ? [geom.coordinates] : geom.type === "MultiPolygon" ? geom.coordinates : [];
+  const lines = geom.type === "LineString" ? [geom.coordinates] : [];
+  const hit = new Set();
+  route.legs.forEach((leg, i) => {
+    for(const poly of polys){
+      if(leg.pts.some(p => inRing(p, poly[0]))){ hit.add(i); return; }
+      if(poly[0].some(([lon, lat]) => nearLeg(leg, lat, lon))){ hit.add(i); return; }
+    }
+    for(const line of lines) if(line.some(([lon, lat]) => nearLeg(leg, lat, lon))){ hit.add(i); return; }
+  });
+  return [...hit];
+}
+const nearLeg = (leg, lat, lon) => leg.pts.some(p => Math.abs(p[0]-lat) < corridorMi()/55 && distMi(p, [lat, lon]) <= corridorMi());
+
+// ---- flight-number lookup (adsbdb.com: free, no key; community data, so it can be out of date) ----
+const AIRLINE_ICAO = {AA:"AAL", DL:"DAL", UA:"UAL", WN:"SWA", B6:"JBU", AS:"ASA", NK:"NKS", F9:"FFT", G4:"AAY", HA:"HAL", SY:"SCX", MX:"MXY", QX:"QXE", OO:"SKW", YX:"RPA", MQ:"ENY", "9E":"EDV", OH:"JIA", YV:"ASH", ZW:"AWI", PT:"PDT", C5:"UCA", G7:"GJS", AC:"ACA", WS:"WJA", AM:"AMX", BA:"BAW", LH:"DLH", AF:"AFR", KL:"KLM", VS:"VIR", EK:"UAE", QR:"QTR", NH:"ANA", JL:"JAL", CX:"CPA", SQ:"SIA", QF:"QFA", EI:"EIN", IB:"IBE", TK:"THY", LX:"SWR"};
+async function lookupFlight(t){
+  const m = t.match(/^([A-Z]{3}|[A-Z0-9]{2})0*(\d{1,4})$/);
+  if(!m) throw new Error(`"${t}" doesn't look like a flight number`);
+  const cs = (m[1].length === 2 ? (AIRLINE_ICAO[m[1]] || m[1]) : m[1]) + m[2];
+  const res = await fetch(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(cs)}`);
+  const j = res.ok ? await res.json() : null;
+  const fr = j && j.response && j.response.flightroute;
+  if(!fr || !fr.origin || !fr.destination) throw new Error(`Couldn't find a route for ${t}`);
+  const ap = a => ({icao: a.icao_code, iata: a.iata_code, name: a.name, st: a.municipality || "", lat: a.latitude, lon: a.longitude});
+  return {flight: t, origin: ap(fr.origin), dest: ap(fr.destination)};
+}
+
+function airportLabel(a){ return a.iata || (/^K[A-Z]{3}$/.test(a.icao) ? a.icao.slice(1) : a.icao); }
+async function resolveRoute(text){
+  await placesReady;
+  const toks = text.toUpperCase().split(/[\s,>→\-–]+/).filter(Boolean);
+  if(!toks.length) return null;
+  const airports = [], notes = [];
+  for(const t of toks){
+    if(/^[A-Z]{3,4}$/.test(t)){
+      const a = PLACE_MAP[t] || PLACE_MAP["K" + t];
+      if(!a) throw new Error(`Couldn't find airport "${t}". Try its 3-letter code, like JFK.`);
+      if(!airports.length || airports[airports.length-1].icao !== a.icao) airports.push(a);
+    } else if(/^([A-Z]{3}|[A-Z0-9]{2})\d{1,4}$/.test(t)){
+      const f = await lookupFlight(t);
+      const last = airports[airports.length-1];
+      if(!last || last.icao !== f.origin.icao) airports.push(f.origin);
+      airports.push(f.dest);
+      notes.push(`${t}: ${airportLabel(f.origin)} → ${airportLabel(f.dest)}`);
+    } else throw new Error(`Didn't understand "${t}"`);
+  }
+  if(airports.length < 2) throw new Error("Enter at least two airports, or a flight number.");
+  const legs = [];
+  for(let i = 0; i < airports.length-1; i++){
+    const from = airports[i], to = airports[i+1];
+    const pts = greatCircle([from.lat, from.lon], [to.lat, to.lon]);
+    const lats = pts.map(p => p[0]);
+    legs.push({from, to, pts, miles: Math.round(distMi([from.lat, from.lon], [to.lat, to.lon])), box: [Math.min(...lats), 0, Math.max(...lats)]});
+  }
+  return {airports, legs, notes};
+}
+
+function drawRoute(){
+  routeLayer.clearLayers();
+  if(!route) return;
+  for(const leg of route.legs){
+    L.polyline(leg.pts, {pane: "route", color: "#ffffff", weight: 3, opacity: .85, dashArray: "1 7", lineCap: "round"}).addTo(routeLayer);
+    L.polyline(leg.pts, {pane: "route", color: "#5fb3ff", weight: 10, opacity: .18, interactive: false}).addTo(routeLayer);
+  }
+  route.airports.forEach(a => L.circleMarker([a.lat, a.lon], {pane: "route", radius: 6, color: "#fff", weight: 2, fillColor: "#5fb3ff", fillOpacity: 1})
+    .bindTooltip(`${esc(airportLabel(a))} · ${esc(a.name)}`, {permanent: false}).addTo(routeLayer));
+}
+
+function routeSummary(){
+  const box = $("routeSum");
+  if(!route){ box.innerHTML = ""; return; }
+  const minInt = +$("minInt").value;
+  const html = route.legs.map((leg, i) => {
+    const near = reports.filter(r => r.rank >= Math.max(minInt, 1) && legOf(r.lat, r.lon) === i);
+    const worst = near.reduce((w, r) => !w || r.rank > w.rank || (r.rank === w.rank && r.t > w.t) ? r : w, null);
+    const byRank = [6,5,4,3,2,1].map(k => [k, near.filter(r => r.rank === k).length]).filter(([,n]) => n);
+    const hz = [];
+    for(const name of ["gairmet", "isigmet"]){
+      const fc = overlays[name].data; if(!fc) continue;
+      const seen = new Set();
+      for(const f of fc.features || []){
+        const p = f.properties || {};
+        if(name === "gairmet" && GAIRMET_SKIP.has(p.hazard)) continue;
+        if(!legsTouching(f.geometry).includes(i)) continue;
+        const label = name === "gairmet" ? `G-AIRMET: ${(SEV_WORD[p.severity] ? SEV_WORD[p.severity] + " " : "")}${GAIRMET_WHAT[p.hazard] || p.hazard}` : `SIGMET: ${(QUAL[p.qualifier] ? QUAL[p.qualifier] + " " : "")}${SIGMET_WHAT[p.hazard] || p.hazard}`;
+        if(!seen.has(label)){ seen.add(label); hz.push(label.replace(/ \(.*\)/, "")); }
+      }
+    }
+    const repLine = near.length
+      ? `${near.length} bumpy report${near.length>1?"s":""} nearby: ${byRank.map(([k,n]) => `<span style="color:${color(k)}">${n} ${LEVELS[k].label.toLowerCase()}</span>`).join(", ")}`
+      : `No bumpy reports within ${corridorMi()} mi`;
+    const worstBtn = worst ? `<button class="link" data-lat="${worst.lat}" data-lon="${worst.lon}">Worst: ${esc(LEVELS[worst.rank].label.toLowerCase())} at ${esc(feet(worst.fl))}, ${esc(ago(worst.t))}</button>` : "";
+    return `<div class="leg"><div class="leghead">${esc(airportLabel(leg.from))} → ${esc(airportLabel(leg.to))} <span class="muted">· ${leg.miles.toLocaleString()} mi</span></div>
+      <div>${repLine}</div>${worstBtn}
+      ${hz.length ? `<div class="hz">${hz.map(h => `<div>${esc(h.charAt(0).toUpperCase()+h.slice(1))}</div>`).join("")}</div>` : `<div class="muted">No G-AIRMETs or SIGMETs along this leg</div>`}</div>`;
+  }).join("");
+  box.innerHTML = html + (route.notes.length ? `<div class="muted small">Flight lookup: ${esc(route.notes.join("; "))}. Routes come from a free community database and can be out of date, so check them against your booking.</div>` : "");
+  box.querySelectorAll("button.link").forEach(b => b.onclick = () => {
+    const lat = +b.dataset.lat, lon = +b.dataset.lon;
+    layer.eachLayer(m => { const ll = m.getLatLng(); if(ll.lat === lat && ll.lng === lon){ map.setView(ll, Math.max(map.getZoom(), 6)); m.openPopup(); } });
+    if(matchMedia("(max-width:600px)").matches){ $("ctl").classList.add("collapsed"); $("toggle").textContent = "Filters"; }
+  });
+  const total = reports.filter(r => r.rank >= Math.max(minInt,1) && nearRoute(r.lat, r.lon)).length;
+  $("mini").textContent = `${route.airports.map(airportLabel).join(" → ")} · ${total} bumpy report${total===1?"":"s"} nearby`;
+}
+
+async function setRoute(text, {fit = true} = {}){
+  $("routeErr").textContent = "";
+  if(!text.trim()){ clearRoute(); return; }
+  $("routeGo").disabled = true; $("routeGo").textContent = "…";
+  try{
+    route = await resolveRoute(text);
+    $("routeIn").value = route.airports.map(airportLabel).join(" ");
+    try{ localStorage.setItem("route", $("routeIn").value); }catch(e){}
+    history.replaceState(null, "", "#route=" + route.airports.map(airportLabel).join("-"));
+    // load hazard data for the summary even if the overlays are switched off
+    await Promise.all(Object.keys(overlays).map(n => overlays[n].data ? null : fetchOverlay(n)));
+    drawRoute(); render(); Object.keys(overlays).forEach(drawOverlay); routeSummary();
+    $("routeClear").hidden = false;
+    if(fit) map.fitBounds(L.latLngBounds(route.legs.flatMap(l => l.pts)).pad(.15));
+  }catch(e){
+    $("routeErr").textContent = e.message;
+  }finally{ $("routeGo").disabled = false; $("routeGo").textContent = "Show"; }
+}
+function clearRoute(){
+  route = null; $("routeIn").value = ""; $("routeErr").textContent = ""; $("routeClear").hidden = true;
+  try{ localStorage.removeItem("route"); }catch(e){}
+  history.replaceState(null, "", location.pathname);
+  drawRoute(); render(); Object.keys(overlays).forEach(drawOverlay); routeSummary(); status();
+}
+$("routeForm").onsubmit = e => { e.preventDefault(); $("routeIn").blur(); setRoute($("routeIn").value); };
+$("routeClear").onclick = clearRoute;
+$("corridor").onchange = () => { if(route){ render(); Object.keys(overlays).forEach(drawOverlay); routeSummary(); } };
 
 function schedule(){
   clearInterval(timer); timer = null;
@@ -725,6 +962,12 @@ if(matchMedia("(max-width:600px)").matches){ $("ctl").classList.add("collapsed")
 else { $("toggle").textContent = "Hide"; }
 altLabel(); load(); schedule();
 Object.keys(overlays).forEach(setOverlay);
+{ // restore a route from the link (#route=JFK-DEN) or from last time
+  const fromHash = (location.hash.match(/route=([A-Za-z0-9\-]+)/) || [])[1];
+  let saved = null; try{ saved = localStorage.getItem("route"); }catch(e){}
+  const r0 = fromHash ? fromHash.replace(/-/g, " ") : saved;
+  if(r0){ $("routeIn").value = r0; setRoute(r0); }
+}
 </script>
 </body>
 </html>
