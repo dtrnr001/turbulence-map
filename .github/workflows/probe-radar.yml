@@ -24,13 +24,14 @@ jobs:
           echo "=== IEM tile CORS"
           curl -s -D h3.txt -o /dev/null -H "Origin: https://dtrnr001.github.io" "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/5/7/12.png"; grep -i "access-control" h3.txt || echo "(no CORS header on IEM tiles)"
           file *.png
-          python3 - <<'PY'
-          from PIL import Image
-          for n in ("qcd.png","iem.png"):
-              try:
-                  im=Image.open(n).convert("RGBA"); px=sum(1 for p in im.getdata() if p[3]>0); print(n, im.size, "colored pixels:", px)
-              except Exception as e: print(n, e)
-          PY
+          cp ../probe/compare.html .
+          for view in "39,-97,4" "35,-90,6" "40,-78,6"; do
+            for src in iem qcd; do
+              n="shot_${src}_$(echo $view | tr ',' '_').png"
+              google-chrome --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1100,700 --virtual-time-budget=15000 --screenshot="$PWD/$n" "file://$PWD/compare.html?src=$src&v=$view" 2>/dev/null || true
+              ls -la "$n" || true
+            done
+          done
           date -u > when.txt
       - run: |
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
