@@ -1,0 +1,24 @@
+name: Rebuild world airports
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [tools/build_airports.py, .github/workflows/build-airports.yml]
+  schedule:
+    - cron: "17 6 1 * *"   # monthly refresh
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/build_airports.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/airports.json
+          git commit -m "Rebuild world airports from OurAirports" || echo "no changes"
+          git pull --rebase -q origin main
+          git push
