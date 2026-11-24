@@ -51,7 +51,7 @@ jobs:
   # Skipped if another update is already queued or running, so chains never pile up.
   next:
     needs: deploy
-    if: always() && github.event_name != 'push'
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -60,14 +60,22 @@ jobs:
     steps:
       - name: Wait until 10 minutes after this run started
         run: |
-          started=$(gh api repos/$REPO/actions/runs/${{ github.run_id }} --jq .run_started_at)
-          wait=$(( 600 - ( $(date +%s) - $(date -d "$started" +%s) ) ))
+          # retry GitHub API hiccups so one timeout doesn't break the 10-minute chain
+          started=""
+          for i in 1 2 3 4 5; do started=$(gh api repos/$REPO/actions/runs/${{ github.run_id }} --jq .run_started_at) && break; sleep 15; done
+          if [ -n "$started" ]; then wait=$(( 600 - ( $(date +%s) - $(date -d "$started" +%s) ) )); else wait=420; fi
           echo "sleeping ${wait}s"
           if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
       - name: Queue the next update
         run: |
-          others=$(gh api "repos/$REPO/actions/workflows/update.yml/runs?per_page=20" \
-            --jq '[.workflow_runs[] | select(.id != ${{ github.run_id }}) | select(.status=="queued" or .status=="in_progress" or .status=="waiting" or .status=="pending")] | length')
+          others=""
+          for i in 1 2 3 4 5; do
+            others=$(gh api "repos/$REPO/actions/workflows/update.yml/runs?per_page=20" \
+              --jq '[.workflow_runs[] | select(.id != ${{ github.run_id }}) | select(.status=="queued" or .status=="in_progress" or .status=="waiting" or .status=="pending")] | length') && break
+            sleep 15
+          done
+          others=${others:-0}
           if [ "$others" -gt 0 ]; then echo "another update is already queued or running; not chaining"; exit 0; fi
-          gh workflow run update.yml --repo "$REPO" --ref main
+          for i in 1 2 3 4 5; do gh workflow run update.yml --repo "$REPO" --ref main && exit 0; sleep 20; done
+          exit 1
 
