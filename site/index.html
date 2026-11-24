@@ -1299,12 +1299,12 @@ const radarLayer = L.tileLayer.wms("https://opengeo.ncep.noaa.gov/geoserver/conu
   attribution: 'Radar: NOAA MRMS via <a href="https://opengeo.ncep.noaa.gov/">NWS</a>'
 });
 function refreshRadar(){ radarLayer.setParams({ _: radarStamp() }); }
-map.createPane("winds").style.zIndex = 360;
+map.createPane("winds").style.zIndex = 330; // behind hazard shapes and reports, never tappable
+map.getPane("winds").style.pointerEvents = "none";
 map.getPane("winds").style.pointerEvents = "none";
 let windData = null;
 
 const windColor = kt => kt >= 150 ? "#ff4d4d" : kt >= 120 ? "#ff8a3d" : kt >= 90 ? "#f7c948" : kt >= 60 ? "#5fd1c1" : "#7f93a3";
-function compassWord(deg){ return ["north","northeast","east","southeast","south","southwest","west","northwest"][Math.round(((deg % 360) + 360) % 360 / 45) % 8]; }
 function windIndex(){
   if(!windData || !windData.times) return -1;
   const now = Date.now();
@@ -1466,23 +1466,6 @@ const WindCanvas = L.Layer.extend({
 });
 const windLayer = new WindCanvas();
 function drawWinds(){ buildWindGrid(); if(map.hasLayer(windLayer)) windLayer._reset(); }
-
-// Tap on empty map while winds are on: show the wind there
-function windPopupHtml(w){
-  const c = windColor(w.kt), kt = w.kt;
-  return `<div class="pop"><div class="urgent" style="color:${c}">Jet-stream wind forecast</div>
-    <h3>${Math.round(kt)} kt (${Math.round(kt * 1.151)} mph) from the ${compassWord(w.from)}</h3>
-    <div class="meta">around 34,000 ft · ${esc(localTime(windGrid.when))}</div>
-    <p class="feel">${kt >= 120 ? "A strong jet stream. Clear-air turbulence is more likely near its edges, especially where the wind changes quickly." : kt >= 90 ? "A fairly strong jet stream. Turbulence is possible near its edges." : "Ordinary winds at this altitude."}</p>
-    <p class="note">GFS forecast via Open-Meteo.</p></div>`;
-}
-map.on("click", e => {
-  if(!$("qtWinds").checked || !windGrid) return;
-  const tgt = e.originalEvent && e.originalEvent.target;
-  if(tgt && tgt.closest && tgt.closest(".leaflet-interactive")) return; // a report or hazard shape was tapped
-  const w = windAt(e.latlng.lat, e.latlng.lng);
-  if(w) L.popup({maxWidth: 300}).setLatLng(e.latlng).setContent(windPopupHtml(w)).openOn(map);
-});
 
 async function loadWinds(){
   try{
