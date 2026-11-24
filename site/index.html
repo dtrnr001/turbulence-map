@@ -65,7 +65,9 @@ button{background:#22303a;color:var(--text);border:1px solid var(--line);border-
 #layers.min #layersBtn .chev{transform:rotate(-90deg)}
 #layers.min .ov{display:none}
 #layers .ov{margin:3px 0}
-#layers .ov > label{font-size:13px}
+#layers .ov > label{font-size:13px;flex-wrap:nowrap;align-items:flex-start;line-height:1.25}
+#layers .ov > label input{margin-top:1px}
+.lt{flex:1;min-width:0}
 #layers input{width:16px;height:16px;margin:0;flex:none}
 #layers .chips{margin:2px 0 4px 22px;gap:2px 8px}
 #layers .ovinfo{display:block;width:100%}
@@ -162,6 +164,7 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
 .tl-ico svg{width:22px;height:22px}
 .tl-ico .n{position:absolute;top:-5px;right:-7px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:#e6edf2;color:#0f1418;font-size:9px;font-weight:700;line-height:14px;text-align:center}
 .tl-ico.tip{top:64px}
+.tltrack.nofun{height:64px}
 .tl-ico.sel svg{filter:drop-shadow(0 0 3px #fff)}
 .tl-tick{top:51px;font-size:10px;line-height:12px;color:var(--muted);transform:translateX(-50%);white-space:nowrap}
 #tlNote{font-size:12px;color:#cfd9e0;min-height:17px;margin-top:1px}
@@ -275,11 +278,11 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
     <div id="windKey" class="windkey" hidden>34,000 ft, kt:
       <span style="color:#7f93a3">&lt;60</span> <span style="color:#5fd1c1">60+</span> <span style="color:#f7c948">90+</span> <span style="color:#ff8a3d">120+</span> <span style="color:#ff4d4d">150+</span></div></div>
   <div class="ov">
-    <label><input type="checkbox" id="ovGairmet"> G-AIRMETs</label>
+    <label><input type="checkbox" id="ovGairmet"><span class="lt">Hazard forecasts (US)</span></label>
     <div class="chips" id="keyGairmet"></div><div class="chips"><span class="ovinfo" id="infoGairmet"></span></div>
   </div>
   <div class="ov">
-    <label><input type="checkbox" id="ovIsigmet"> SIGMETs</label>
+    <label><input type="checkbox" id="ovIsigmet"><span class="lt">Severe weather warnings</span></label>
     <div class="chips" id="keyIsigmet"></div><div class="chips"><span class="ovinfo" id="infoIsigmet"></span></div>
   </div>
 
@@ -327,11 +330,11 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
     <h4>The aircraft matters</h4>
     <p>The same air feels much rougher in a small plane than in an airliner. Each report says what kind of aircraft reported it, and you can filter by aircraft size.</p>
     <h4>My flight</h4>
-    <p>Type your airports in order, including layovers (for example <b>JFK ORD DEN</b>), or your flight numbers (for example <b>DL1234 DL567</b>), then tap Show. The map draws the most direct path between each pair of airports and highlights the reports, G-AIRMETs and SIGMETs within the distance you choose. Airports anywhere in the world work, but pilot reports and G-AIRMETs cover mainly the US, so over oceans and abroad the SIGMET layer is the main guide. Real flights often stray from the direct path to avoid weather or follow airways, so treat it as a guide. Flight-number lookups use a free community database, so check that the airports match your booking.</p>
+    <p>Type your airports in order, including layovers (for example <b>JFK ORD DEN</b>), or your flight numbers (for example <b>DL1234 DL567</b>), then tap Show. The map draws the most direct path between each pair of airports and highlights the reports, hazard forecasts and severe weather warnings within the distance you choose. Airports anywhere in the world work, but pilot reports and G-AIRMETs cover mainly the US, so over oceans and abroad the severe weather warnings are the main guide. Real flights often stray from the direct path to avoid weather or follow airways, so treat it as a guide. Flight-number lookups use a free community database, so check that the airports match your booking.</p>
     <h4>Trip timeline</h4>
-    <p>Once a route is set, a bar along the bottom shows the whole trip from left to right, drawn to scale: each flight, each layover (with its airport code), and turbulence icons where bumpy reports and turbulence advisories sit along the way. Flight times are estimates (about 480 mph plus 35 minutes per flight for taxi, climb and descent), and you can choose how long to allow per layover in My flight. Reports describe the air right now, so conditions will change by the time you get there. Tap an icon for details, or tap the title to fold the bar away. Turn on <b>Fun tips</b> for a lighthearted guess at a smooth stretch to use the bathroom, and a heads-up to finish your drink before the bumps.</p>
+    <p>Once a route is set, a bar along the bottom shows the whole trip from left to right, drawn to scale: each flight, each layover (with its airport code), and turbulence icons where bumpy reports and turbulence forecasts and warnings sit along the way. Flight times are estimates (about 480 mph plus 35 minutes per flight for taxi, climb and descent), and you can choose how long to allow per layover in My flight. Reports describe the air right now, so conditions will change by the time you get there. Tap an icon for details, or tap the title to fold the bar away. Turn on <b>Fun tips</b> for a lighthearted guess at a smooth stretch to use the bathroom, and a heads-up to finish your drink before the bumps.</p>
     <h4>Overlays</h4>
-    <p><b>G-AIRMETs</b> (dashed shapes) are forecasts for the US of where moderate turbulence, icing, low clouds and strong winds are expected. <b>SIGMETs</b> (solid shapes) are warnings of more serious hazards: severe turbulence, thunderstorms, icing, volcanic ash. The SIGMET layer shows the international ones, which cover oceans and other countries.</p>
+    <p><b>Hazard forecasts (US)</b> (dashed shapes) show where moderate turbulence, icing, low clouds and strong winds are expected over the US. Pilots call these G-AIRMETs. <b>Severe weather warnings</b> (solid shapes) cover more serious hazards: severe turbulence, thunderstorms, icing and volcanic ash, worldwide, including over oceans. Pilots call these SIGMETs.</p>
     <h4>Radar and winds aloft</h4>
     <p>The <b>Layers</b> box on the map adds <b>radar</b> (rain and storms from NOAA's quality-controlled radar mosaic, which filters out birds, bugs and ground clutter; refreshed every 5 minutes) and <b>winds aloft</b> (forecast jet-stream winds around 34,000 ft, where airliners cruise). Turbulence is more common near storms and along the edges of a strong jet stream, so these help explain the reports.</p>
     <h4>Where the data comes from</h4>
@@ -768,7 +771,7 @@ function gairmetPopup(p){
   const head = `Forecast: ${sev ? sev + " " : ""}${what}`;
   const alt = between(p.base, p.top);
   const vt = toDate(p.validTime);
-  return `<div class="pop"><div class="urgent" style="color:${st.c}">G-AIRMET forecast</div>
+  return `<div class="pop"><div class="urgent" style="color:${st.c}">Hazard forecast <span style="opacity:.7;font-weight:400">(G-AIRMET)</span></div>
     <h3>${esc(head.charAt(0).toUpperCase()+head.slice(1))}</h3>
     <div class="meta">${alt?esc(alt)+" · ":""}around ${esc(localTime(vt))}</div>
     ${p.dueTo && p.hazard!=="ICE" && decodeCause(p.dueTo) ? `<p class="feel">${esc(decodeCause(p.dueTo))}.</p>` : ""}
@@ -789,7 +792,7 @@ function isigmetPopup(p){
   const to = toDate(p.validTimeTo);
   const dir = COMPASS[String(p.dir||"").toUpperCase()];
   const moving = dir ? `Moving ${dir}${p.spd ? ` at ${esc(p.spd)} kt` : ""}.` : (/STNR/.test(p.rawSigmet||"") ? "Stationary." : "");
-  return `<div class="pop"><div class="urgent" style="color:${st.c}">SIGMET warning${fcst?" · forecast position":""}</div>
+  return `<div class="pop"><div class="urgent" style="color:${st.c}">Severe weather warning <span style="opacity:.7;font-weight:400">(SIGMET)</span>${fcst?" · forecast position":""}</div>
     <h3>${esc((q + what).charAt(0).toUpperCase() + (q + what).slice(1))}${esc(extra)}</h3>
     <div class="meta">${alt?esc(alt)+" · ":""}until ${esc(localTime(to))}</div>
     <p class="feel">${esc(p.firName ? "Over " + String(p.firName).replace(/^[A-Z]{4}\s+/,"").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()) + ". " : "")}${moving}${fcst?" This dashed shape is where it's expected to be by the end of the warning.":""}</p>
@@ -1021,7 +1024,7 @@ function routeSummary(){
         const p = f.properties || {};
         if(name === "gairmet" && GAIRMET_SKIP.has(p.hazard)) continue;
         if(!legsTouching(f.geometry).includes(i)) continue;
-        const label = name === "gairmet" ? `G-AIRMET: ${(SEV_WORD[p.severity] ? SEV_WORD[p.severity] + " " : "")}${GAIRMET_WHAT[p.hazard] || p.hazard}` : `SIGMET: ${(QUAL[p.qualifier] ? QUAL[p.qualifier] + " " : "")}${SIGMET_WHAT[p.hazard] || p.hazard}`;
+        const label = name === "gairmet" ? `Hazard forecast: ${(SEV_WORD[p.severity] ? SEV_WORD[p.severity] + " " : "")}${GAIRMET_WHAT[p.hazard] || p.hazard}` : `Severe weather warning: ${(QUAL[p.qualifier] ? QUAL[p.qualifier] + " " : "")}${SIGMET_WHAT[p.hazard] || p.hazard}`;
         if(!seen.has(label)){ seen.add(label); hz.push(label.replace(/ \(.*\)/, "")); }
       }
     }
@@ -1031,7 +1034,7 @@ function routeSummary(){
     const worstBtn = worst ? `<button class="link" data-lat="${worst.lat}" data-lon="${worst.lon}">Worst: ${esc(LEVELS[worst.rank].label.toLowerCase())} at ${esc(feet(worst.fl))}, ${esc(ago(worst.t))}</button>` : "";
     return `<div class="leg"><div class="leghead">${esc(airportLabel(leg.from))} → ${esc(airportLabel(leg.to))} <span class="muted">· ${leg.miles.toLocaleString()} mi</span></div>
       <div>${repLine}</div>${worstBtn}
-      ${hz.length ? `<div class="hz">${hz.map(h => `<div>${esc(h.charAt(0).toUpperCase()+h.slice(1))}</div>`).join("")}</div>` : `<div class="muted">No G-AIRMETs or SIGMETs along this leg</div>`}</div>`;
+      ${hz.length ? `<div class="hz">${hz.map(h => `<div>${esc(h.charAt(0).toUpperCase()+h.slice(1))}</div>`).join("")}</div>` : `<div class="muted">No hazard forecasts or severe weather warnings along this leg</div>`}</div>`;
   }).join("");
   box.innerHTML = html + (route.notes.length ? `<div class="muted small">Flight lookup: ${esc(route.notes.join("; "))}. Routes come from a free community database and can be out of date, so check them against your booking.</div>` : "");
   box.querySelectorAll("button.link").forEach(b => b.onclick = () => {
@@ -1091,7 +1094,7 @@ const ICO = {
 // Turbulence-type advisories that go on the bar: [rank for color, plain words]
 const TL_HAZ = {
   gairmet: {"TURB-HI": [3, "Forecast: moderate turbulence (high altitude)"], "TURB-LO": [3, "Forecast: moderate turbulence (low altitude)"], "LLWS": [3, "Forecast: low-level wind shear near the ground"]},
-  isigmet: {TURB: [5, "SIGMET warning: severe turbulence"], MTW: [5, "SIGMET warning: mountain-wave turbulence"], TS: [4, "SIGMET warning: thunderstorms"]},
+  isigmet: {TURB: [5, "Severe weather warning: severe turbulence"], MTW: [5, "Severe weather warning: mountain-wave turbulence"], TS: [4, "Severe weather warning: thunderstorms"]},
 };
 let tlItems = [];
 
@@ -1237,6 +1240,7 @@ function renderTimeline(){
   for(let m = step; m < T - step * .4; m += step) parts.push(`<div class="tl-tick" style="left:${X(m)}">${m/60} h</div>`);
 
   $("tlTrack").innerHTML = parts.join("");
+  $("tlTrack").classList.toggle("nofun", !$("tlFun").checked);
   tlItems = items;
   $("tlTrack").querySelectorAll("[data-k]").forEach(el => el.onclick = () => tlSelect(+el.dataset.k, el));
   tlNoteDefault();
@@ -1248,8 +1252,8 @@ function tlNoteDefault(){
   const reps = tlItems.filter(x => x.kind === "rep").reduce((n, x) => n + x.list.length, 0);
   const bands = tlItems.filter(x => x.kind === "band").length;
   $("tlNote").innerHTML = (reps || bands)
-    ? `<span class="muted">${reps ? `${reps} bumpy report${reps === 1 ? "" : "s"}` : ""}${reps && bands ? " and " : ""}${bands ? `${bands} advisor${bands === 1 ? "y" : "ies"}` : ""} along the way. Tap an icon. Times are estimates.</span>`
-    : `<span class="muted">No bumpy reports or turbulence advisories along the way right now. Times are estimates.</span>`;
+    ? `<span class="muted">${reps ? `${reps} bumpy report${reps === 1 ? "" : "s"}` : ""}${reps && bands ? " and " : ""}${bands ? `${bands} hazard area${bands === 1 ? "" : "s"}` : ""} along the way. Tap an icon. Times are estimates.</span>`
+    : `<span class="muted">No bumpy reports or turbulence hazard areas along the way right now. Times are estimates.</span>`;
 }
 function tlSelect(k, el){
   const it = tlItems[k]; if(!it) return;
