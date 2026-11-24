@@ -556,7 +556,7 @@ function render(){
     counts[r.rank]++; shown++;
     const dim = route && !nearRoute(r.lat, r.lon);
     const m = L.circleMarker([r.lat, r.lon], {
-      radius: (4 + r.rank*1.3) * (dim ? .7 : 1), color: r.urgent ? "#fff" : "#000", weight: r.urgent ? 2 : 1,
+      radius: (4 + r.rank*1.3) * .75 * (dim ? .7 : 1), color: r.urgent ? "#fff" : "#000", weight: r.urgent ? 2 : 1,
       fillColor: color(r.rank), fillOpacity: dim ? .18 : .9, opacity: dim ? .2 : .8
     });
     m.bindPopup(() => popup(r), {maxWidth: 320});
