@@ -27,7 +27,7 @@ select{background:#0f1418;color:var(--text);border:1px solid var(--line);border-
 button{background:#22303a;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
 @media (hover:hover){button:hover{border-color:var(--accent)}}
 /* ---------- bottom panel: one checkbox per layer, each with a small key that can be folded away ---------- */
-#legend{bottom:22px;left:12px;width:330px;padding:8px 10px;font-size:12px;max-height:46vh;overflow-y:auto}
+#legend{bottom:22px;left:12px;width:330px;padding:8px 10px;font-size:12px}
 .lyrs{display:flex;flex-wrap:wrap;gap:5px}
 .lyr{display:flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:#0f1418;padding:0 3px 0 7px}
 .lyr label{margin:0;display:flex;align-items:center;gap:5px;color:var(--text);font-size:13px;padding:5px 3px 5px 0;white-space:nowrap;cursor:pointer}
@@ -37,8 +37,9 @@ button{background:#22303a;color:var(--text);border:1px solid var(--line);border-
 .lyr.on .kmin{display:block}
 .lyr.on label{padding-right:0}
 .lyr.min .kmin{transform:rotate(-90deg)}
-.keys{display:flex;flex-wrap:wrap;gap:6px 18px}
-.keys:has(.key:not([hidden])){margin-top:8px;padding-top:7px;border-top:1px solid var(--line)}
+/* only one key at a time, popped up just above its checkbox */
+.keys{position:absolute;bottom:calc(100% + 6px);left:0;font-size:11px}
+.key{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 10px 6px;backdrop-filter:blur(6px);box-shadow:0 4px 14px #0006}
 .key[hidden]{display:none}
 .key h5{margin:0 0 3px;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
 .key h5 .kinfo{text-transform:none;letter-spacing:0;font-weight:400}
@@ -173,13 +174,12 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   .leaflet-control-attribution{font-size:8px;line-height:1.3}
   #bar button{padding:12px 10px;font-size:15px}
   #tl{left:10px;right:10px;bottom:calc(86px + env(safe-area-inset-bottom));max-width:none;padding:6px 10px 5px}
-  #legend{bottom:calc(86px + env(safe-area-inset-bottom));left:10px;right:10px;width:auto;padding:7px 8px;max-height:52vh}
+  #legend{bottom:calc(86px + env(safe-area-inset-bottom));left:10px;right:10px;width:auto;padding:7px 8px}
   .lyrs{gap:4px}
   .lyr{padding:0 2px 0 6px}
   .lyr label{font-size:12.5px;gap:4px}
   .lyr input{width:16px;height:16px}
   .kmin{padding:8px 3px 8px 0}
-  .keys{gap:8px 16px;font-size:11px}
   body.has-tl #legend{bottom:calc(94px + var(--tlh, 0px) + env(safe-area-inset-bottom))}
   .tltrack{margin:2px 10px 0}
   .tlfun{font-size:13px}
@@ -1535,22 +1535,33 @@ function setPireps(){
 try{ $("ovPireps").checked = localStorage.getItem("ov_pireps") !== "0"; }catch(e){}
 $("ovPireps").onchange = setPireps;
 setPireps();
-let keyMin = {};
-try{ keyMin = JSON.parse(localStorage.getItem("keyMin") || "{}") || {}; }catch(e){}
+let keyOpen = "ovPireps";
+try{ const k = localStorage.getItem("keyOpen"); if(k !== null) keyOpen = k; }catch(e){}
 function syncKeys(){
+  let shown = null;
   document.querySelectorAll(".lyr").forEach(el => {
-    const box = el.querySelector("input"), on = box.checked, min = !!keyMin[box.id];
-    el.classList.toggle("on", on); el.classList.toggle("min", on && min);
-    el.querySelector(".kmin").setAttribute("aria-expanded", String(on && !min));
-    document.querySelector(`.key[data-box="${box.id}"]`).hidden = !on || min;
+    const box = el.querySelector("input"), on = box.checked, open = on && keyOpen === box.id;
+    el.classList.toggle("on", on); el.classList.toggle("min", on && !open);
+    el.querySelector(".kmin").setAttribute("aria-expanded", String(open));
+    document.querySelector(`.key[data-box="${box.id}"]`).hidden = !open;
+    if(open) shown = el;
   });
+  // line the key up with its checkbox, but keep it on screen
+  if(shown){
+    const k = document.querySelector(".keys"), max = $("legend").clientWidth - k.offsetWidth;
+    k.style.left = `${Math.max(0, Math.min(shown.offsetLeft - 1, max))}px`;
+  }
 }
-document.querySelectorAll(".lyr input").forEach(b => b.addEventListener("change", syncKeys));
-document.querySelectorAll(".kmin").forEach(btn => btn.onclick = () => {
-  const id = btn.dataset.box; keyMin[id] = !keyMin[id];
-  try{ localStorage.setItem("keyMin", JSON.stringify(keyMin)); }catch(e){}
+function setKeyOpen(id){
+  keyOpen = id || "";
+  try{ localStorage.setItem("keyOpen", keyOpen); }catch(e){}
   syncKeys();
-});
+}
+document.querySelectorAll(".lyr input").forEach(b => b.addEventListener("change", () => {
+  if(b.checked) setKeyOpen(b.id); else if(keyOpen === b.id) setKeyOpen(null); else syncKeys();
+}));
+document.querySelectorAll(".kmin").forEach(btn => btn.onclick = () => setKeyOpen(keyOpen === btn.dataset.box ? null : btn.dataset.box));
+map.on("click", () => { if(keyOpen) setKeyOpen(null); });
 syncKeys();
 // ---------- the two panels: only one open at a time; on a phone they slide up from the bottom ----------
 function isPhone(){ return matchMedia("(max-width:600px)").matches; }
