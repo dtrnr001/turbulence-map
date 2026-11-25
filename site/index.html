@@ -14,6 +14,7 @@
   --none:#7d8b96; --lgt:#3fbf6f; --lgtmod:#c9d23a; --mod:#f2a030; --modsev:#ee6a2c; --sev:#e0343a; --extm:#b02bd6;
 }
 *{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 #map{position:absolute;inset:0;background:#1b2228}
 .dark-tiles{filter:grayscale(1) invert(1) brightness(.95) contrast(.6)} /* plain gray: no green forests, so radar colors stand out */
@@ -176,7 +177,7 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   #legend{bottom:calc(86px + env(safe-area-inset-bottom));left:10px;right:10px;width:auto;padding:7px 8px}
   .lyrs{gap:4px}
   .lyr{padding:0 8px 0 6px}
-  .lyr label{font-size:12.5px;gap:4px}
+  .lyr label{font-size:13px;gap:4px}
   .lyr input{width:16px;height:16px}
   .lyr label{padding:8px 0}
   body.has-tl #legend{bottom:calc(94px + var(--tlh, 0px) + env(safe-area-inset-bottom))}
@@ -270,7 +271,7 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   <div class="lyrs">
     <div class="lyr"><label><input type="checkbox" id="ovPireps" checked>Pilot reports</label></div>
     <div class="lyr"><label><input type="checkbox" id="ovGairmet">Hazard forecasts (US)</label></div>
-    <div class="lyr"><label><input type="checkbox" id="ovIsigmet">Severe weather warnings</label></div>
+    <div class="lyr"><label><input type="checkbox" id="ovIsigmet">Severe warnings</label></div>
     <div class="lyr"><label><input type="checkbox" id="qtRadar">Radar</label></div>
     <div class="lyr"><label><input type="checkbox" id="qtWinds">Wind</label></div>
   </div>
