@@ -29,14 +29,13 @@ button{background:#22303a;color:var(--text);border:1px solid var(--line);border-
 /* ---------- bottom panel: one checkbox per layer, each with a small key that can be folded away ---------- */
 #legend{bottom:22px;left:12px;width:330px;padding:8px 10px;font-size:12px}
 .lyrs{display:flex;flex-wrap:wrap;gap:5px}
-.lyr{display:flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:#0f1418;padding:0 3px 0 7px}
+.lyr{display:flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:#0f1418;padding:0 9px 0 7px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:transform .12s,box-shadow .12s}
 .lyr label{margin:0;display:flex;align-items:center;gap:5px;color:var(--text);font-size:13px;padding:5px 3px 5px 0;white-space:nowrap;cursor:pointer}
 .lyr input{width:16px;height:16px;margin:0;flex:none;accent-color:var(--accent)}
 .lyr.on{border-color:#5fb3ff88;background:#5fb3ff1c}
-.kmin{display:none;background:none;border:none;color:var(--muted);font-size:11px;line-height:1;padding:7px 4px 7px 2px;transition:transform .15s}
-.lyr.on .kmin{display:block}
-.lyr.on label{padding-right:0}
-.lyr.min .kmin{transform:rotate(-90deg)}
+.lyr.keyon{box-shadow:0 0 0 2px var(--accent)}
+.lyr.holding{transform:scale(.95)}
+.key::after{content:"Hold a layer for its key";display:block;margin-top:5px;padding-top:4px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);white-space:nowrap}
 /* only one key at a time, popped up just above its checkbox */
 .keys{position:absolute;bottom:calc(100% + 6px);left:0;font-size:11px}
 .key{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 10px 6px;backdrop-filter:blur(6px);box-shadow:0 4px 14px #0006}
@@ -176,10 +175,10 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   #tl{left:10px;right:10px;bottom:calc(86px + env(safe-area-inset-bottom));max-width:none;padding:6px 10px 5px}
   #legend{bottom:calc(86px + env(safe-area-inset-bottom));left:10px;right:10px;width:auto;padding:7px 8px}
   .lyrs{gap:4px}
-  .lyr{padding:0 2px 0 6px}
+  .lyr{padding:0 8px 0 6px}
   .lyr label{font-size:12.5px;gap:4px}
   .lyr input{width:16px;height:16px}
-  .kmin{padding:8px 3px 8px 0}
+  .lyr label{padding:8px 0}
   body.has-tl #legend{bottom:calc(94px + var(--tlh, 0px) + env(safe-area-inset-bottom))}
   .tltrack{margin:2px 10px 0}
   .tlfun{font-size:13px}
@@ -269,11 +268,11 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
 </div>
 <div class="panel" id="legend">
   <div class="lyrs">
-    <div class="lyr"><label><input type="checkbox" id="ovPireps" checked>Pilot reports</label><button class="kmin" data-box="ovPireps" aria-label="Show or hide the pilot report key">▾</button></div>
-    <div class="lyr"><label><input type="checkbox" id="ovGairmet">Hazard forecasts (US)</label><button class="kmin" data-box="ovGairmet" aria-label="Show or hide the hazard forecast key">▾</button></div>
-    <div class="lyr"><label><input type="checkbox" id="ovIsigmet">Severe weather warnings</label><button class="kmin" data-box="ovIsigmet" aria-label="Show or hide the severe weather key">▾</button></div>
-    <div class="lyr"><label><input type="checkbox" id="qtRadar">Radar</label><button class="kmin" data-box="qtRadar" aria-label="Show or hide the radar key">▾</button></div>
-    <div class="lyr"><label><input type="checkbox" id="qtWinds">Wind</label><button class="kmin" data-box="qtWinds" aria-label="Show or hide the wind key">▾</button></div>
+    <div class="lyr"><label><input type="checkbox" id="ovPireps" checked>Pilot reports</label></div>
+    <div class="lyr"><label><input type="checkbox" id="ovGairmet">Hazard forecasts (US)</label></div>
+    <div class="lyr"><label><input type="checkbox" id="ovIsigmet">Severe weather warnings</label></div>
+    <div class="lyr"><label><input type="checkbox" id="qtRadar">Radar</label></div>
+    <div class="lyr"><label><input type="checkbox" id="qtWinds">Wind</label></div>
   </div>
   <div class="keys">
     <div class="key" data-box="ovPireps"><h5>Pilot reports</h5>
@@ -349,7 +348,7 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
     <h4>Overlays</h4>
     <p><b>Hazard forecasts (US)</b> (dashed shapes) show where moderate turbulence, icing, low clouds and strong winds are expected over the US. Pilots call these G-AIRMETs. <b>Severe weather warnings</b> (solid shapes) cover more serious hazards: severe turbulence, thunderstorms, icing and volcanic ash, worldwide, including over oceans. Pilots call these SIGMETs.</p>
     <h4>Radar and winds aloft</h4>
-    <p>The checkboxes at the bottom turn each layer on or off, and the small arrow next to a checked one hides or shows its color key. Besides the pilot reports, hazard forecasts and severe weather warnings, you can add <b>radar</b> (rain and storms from NOAA's quality-controlled radar mosaic, which filters out birds, bugs and ground clutter; refreshed every 5 minutes) and <b>winds aloft</b> (forecast jet-stream winds around 34,000 ft, where airliners cruise). Turbulence is more common near storms and along the edges of a strong jet stream, so these help explain the reports.</p>
+    <p>The checkboxes at the bottom turn each layer on or off. Press and hold one to see its color key (one at a time, on the left); tap the map to close it. Besides the pilot reports, hazard forecasts and severe weather warnings, you can add <b>radar</b> (rain and storms from NOAA's quality-controlled radar mosaic, which filters out birds, bugs and ground clutter; refreshed every 5 minutes) and <b>winds aloft</b> (forecast jet-stream winds around 34,000 ft, where airliners cruise). Turbulence is more common near storms and along the edges of a strong jet stream, so these help explain the reports.</p>
     <h4>Where the data comes from</h4>
     <p>NOAA's Aviation Weather Center; radar from NOAA's MRMS mosaic; winds from the GFS model via <a href="https://open-meteo.com/" style="color:var(--accent)">Open-Meteo</a> (CC BY 4.0). The map refreshes itself every few minutes. The pill at the top says how old the newest data is (green is fresh, amber is getting old, red means the feed has stalled), and you can tap it to refresh right away. It's for curiosity and context, not flight planning.</p>
   </div>
@@ -1538,29 +1537,32 @@ setPireps();
 let keyOpen = "ovPireps";
 try{ const k = localStorage.getItem("keyOpen"); if(k !== null) keyOpen = k; }catch(e){}
 function syncKeys(){
-  let shown = null;
   document.querySelectorAll(".lyr").forEach(el => {
-    const box = el.querySelector("input"), on = box.checked, open = on && keyOpen === box.id;
-    el.classList.toggle("on", on); el.classList.toggle("min", on && !open);
-    el.querySelector(".kmin").setAttribute("aria-expanded", String(open));
+    const box = el.querySelector("input"), open = keyOpen === box.id;
+    el.classList.toggle("on", box.checked); el.classList.toggle("keyon", open);
     document.querySelector(`.key[data-box="${box.id}"]`).hidden = !open;
-    if(open) shown = el;
   });
-  // line the key up with its checkbox, but keep it on screen
-  if(shown){
-    const k = document.querySelector(".keys"), max = $("legend").clientWidth - k.offsetWidth;
-    k.style.left = `${Math.max(0, Math.min(shown.offsetLeft - 1, max))}px`;
-  }
 }
 function setKeyOpen(id){
   keyOpen = id || "";
   try{ localStorage.setItem("keyOpen", keyOpen); }catch(e){}
   syncKeys();
 }
-document.querySelectorAll(".lyr input").forEach(b => b.addEventListener("change", () => {
-  if(b.checked) setKeyOpen(b.id); else if(keyOpen === b.id) setKeyOpen(null); else syncKeys();
-}));
-document.querySelectorAll(".kmin").forEach(btn => btn.onclick = () => setKeyOpen(keyOpen === btn.dataset.box ? null : btn.dataset.box));
+// tap a layer to turn it on or off; press and hold it to show its key (always in the same spot, on the left)
+document.querySelectorAll(".lyr").forEach(el => {
+  const id = el.querySelector("input").id;
+  let t = null, x0 = 0, y0 = 0, held = false;
+  const cancel = () => { clearTimeout(t); t = null; el.classList.remove("holding"); };
+  el.addEventListener("pointerdown", e => {
+    held = false; x0 = e.clientX; y0 = e.clientY; el.classList.add("holding");
+    t = setTimeout(() => { held = true; cancel(); setKeyOpen(keyOpen === id ? null : id); if(navigator.vibrate) navigator.vibrate(10); }, 450);
+  });
+  el.addEventListener("pointermove", e => { if(t && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) cancel(); });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(ev => el.addEventListener(ev, cancel));
+  el.addEventListener("click", e => { if(held){ e.preventDefault(); held = false; } }, true); // a hold isn't a tap
+  el.addEventListener("contextmenu", e => e.preventDefault());
+});
+document.querySelectorAll(".lyr input").forEach(b => b.addEventListener("change", syncKeys));
 map.on("click", () => { if(keyOpen) setKeyOpen(null); });
 syncKeys();
 // ---------- the two panels: only one open at a time; on a phone they slide up from the bottom ----------
