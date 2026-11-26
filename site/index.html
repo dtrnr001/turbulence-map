@@ -136,16 +136,15 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
 #altLbl{color:var(--text);font-weight:600}
 
 /* ---------- wind altitude slider: slides in on the right while the wind key is open ---------- */
-#windAlt{position:fixed;z-index:1150;right:12px;top:50%;margin-top:-105px;height:210px;width:104px;padding:10px 10px 10px 8px;
+#windAlt{position:fixed;z-index:1150;right:12px;top:50%;margin-top:-98px;height:196px;width:64px;padding:0;
   border-radius:14px;transition:transform .2s ease,opacity .2s ease;touch-action:none;-webkit-user-select:none;user-select:none}
 #windAlt.off{transform:translateX(130%);opacity:0;pointer-events:none}
-#windAlt h6{margin:0 0 4px;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:right}
-.wa-rail{position:absolute;right:20px;top:34px;bottom:20px;width:4px;border-radius:2px;background:#2b3741}
-.wa-det{position:absolute;right:0;left:0;height:44px;margin-top:-22px;display:flex;align-items:center;justify-content:flex-end;gap:0;padding:0 39px 0 0;background:none;border:none;color:var(--muted);font-size:10.5px;line-height:1.15;text-align:right;cursor:pointer}
-.wa-det b{display:block;color:var(--text);font-size:12px;font-weight:600}
-.wa-det::after{content:"";position:absolute;right:16px;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;background:#182027;border:2px solid #55636e;box-sizing:border-box}
-.wa-det.sel b{color:var(--accent)}
-.wa-thumb{position:absolute;right:11px;width:22px;height:22px;margin-top:-11px;border-radius:50%;background:#e6edf2;border:3px solid var(--accent);box-shadow:0 2px 8px #0008;transition:top .15s ease;pointer-events:none}
+.wa-rail{position:absolute;left:50%;margin-left:-2px;top:18px;bottom:44px;width:4px;border-radius:2px;background:#2b3741}
+.wa-det{position:absolute;left:0;right:0;height:44px;margin-top:-14px;padding:25px 0 0;background:none;border:none;color:var(--text);font-size:10px;font-weight:600;line-height:13px;text-align:center;white-space:nowrap;cursor:pointer}
+.wa-det span{position:relative;background:#182027;border-radius:3px;padding:0 2px}
+.wa-det::before{content:"";position:absolute;left:50%;top:8px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:#182027;border:2px solid #55636e;box-sizing:border-box}
+.wa-det.sel{color:var(--accent)}
+.wa-thumb{position:absolute;left:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#e6edf2;border:3px solid var(--accent);box-shadow:0 2px 8px #0008;transition:top .15s ease;pointer-events:none}
 #windAlt.drag .wa-thumb{transition:none}
 .lyr .alt{color:var(--muted);font-size:11px;margin-left:3px}
 /* ---------- flight timeline bar (bottom of the screen when a route is set) ---------- */
@@ -192,7 +191,7 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   #tl{left:10px;right:10px;bottom:calc(94px + var(--lgh, 90px) + env(safe-area-inset-bottom));max-width:none;padding:6px 10px 5px}
   #legend{bottom:calc(86px + env(safe-area-inset-bottom));left:10px;right:calc(16px + var(--kw));width:auto;padding:7px 6px}
   .lyrs{gap:4px 3px}
-  .lyr{padding:0 6px 0 5px}
+  .lyr{padding:0 5px 0 4px}
   .keys > .key:not([hidden]){flex:1}
   /* the key sits in its own column to the right of the checkboxes and buttons */
   .keys{position:absolute;left:auto !important;right:calc(-7px - var(--kw));bottom:-57px;width:var(--kw);height:var(--colh, 150px);display:flex;flex-direction:column;justify-content:flex-end;z-index:1000}
@@ -210,11 +209,11 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   .knone{display:flex;align-items:center;text-align:center;flex:1;color:var(--muted);font-size:11px;line-height:1.3;border-style:dashed;background:#182027aa}
   .knone[hidden]{display:none}
   .knone::after{display:none}
-  .lyr label{font-size:13px;gap:4px}
-  .lyr input{width:16px;height:16px}
-  .lyr label{padding:8px 0}
+  .lyr label{font-size:12px;gap:3px;padding:6px 0}
+  .lyr input{width:14px;height:14px}
+  .lyr .alt{font-size:10px;margin-left:1px}
   .tltrack{margin:2px 10px 0}
-  #windAlt{right:8px;width:96px;margin-top:0;top:auto;bottom:var(--wab, 260px)}
+  #windAlt{right:8px;margin-top:0;top:auto;bottom:var(--wab, 260px)}
   .tlfun{font-size:13px}
   .tlfun input{width:18px;height:18px}
   #left .drawer{position:fixed;left:0;right:0;bottom:0;z-index:1200;max-height:72vh;border-radius:16px 16px 0 0;padding:6px 16px calc(16px + env(safe-area-inset-bottom));transition:transform .2s}
@@ -301,11 +300,10 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   </div>
 </div>
 <div class="panel off" id="windAlt" role="slider" aria-label="Wind altitude" aria-valuemin="0" aria-valuemax="2" tabindex="0">
-  <h6>Altitude</h6>
   <div class="wa-rail"></div>
-  <button class="wa-det" data-lvl="250"><span><b>34,000 ft</b>Jet stream</span></button>
-  <button class="wa-det" data-lvl="700"><span><b>10,000 ft</b>Climb</span></button>
-  <button class="wa-det" data-lvl="sfc"><span><b>Surface</b>Ground</span></button>
+  <button class="wa-det" data-lvl="250" aria-label="34,000 feet (jet stream)"><span>34,000 ft</span></button>
+  <button class="wa-det" data-lvl="700" aria-label="10,000 feet"><span>10,000 ft</span></button>
+  <button class="wa-det" data-lvl="sfc" aria-label="Surface"><span>Surface</span></button>
   <div class="wa-thumb"></div>
 </div>
 <div class="panel" id="legend">
@@ -391,7 +389,7 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
     <h4>Overlays</h4>
     <p><b>Hazard forecasts (US)</b> (dashed shapes) show where moderate turbulence, icing, low clouds and strong winds are expected over the US. Pilots call these G-AIRMETs. <b>Severe weather warnings</b> (solid shapes) cover more serious hazards: severe turbulence, thunderstorms, icing and volcanic ash, worldwide, including over oceans. Pilots call these SIGMETs.</p>
     <h4>Radar and winds aloft</h4>
-    <p>The checkboxes at the bottom turn each layer on or off. Press and hold one to see its color key (one at a time, on the left); tap the map to close it. Besides the pilot reports, hazard forecasts and severe weather warnings, you can add <b>radar</b> (rain and storms from NOAA's quality-controlled radar mosaic, which filters out birds, bugs and ground clutter; refreshed every 5 minutes) and <b>winds aloft</b> (forecast jet-stream winds around 34,000 ft, where airliners cruise). Turbulence is more common near storms and along the edges of a strong jet stream, so these help explain the reports.</p>
+    <p>The checkboxes at the bottom turn each layer on or off. Press and hold one to see its color key (one at a time, on the left); tap the map to close it. Besides the pilot reports, hazard forecasts and severe weather warnings, you can add <b>radar</b> (rain and storms from NOAA's quality-controlled radar mosaic, which filters out birds, bugs and ground clutter; refreshed every 5 minutes) and <b>wind</b> (forecast winds at 34,000 ft where airliners cruise, at 10,000 ft, or at the surface; press and hold Wind to pick the altitude on the slider at the right). Turbulence is more common near storms, along the edges of a strong jet stream, and in strong surface winds near the ground, so these help explain the reports.</p>
     <h4>Where the data comes from</h4>
     <p>NOAA's Aviation Weather Center; radar from NOAA's MRMS mosaic; winds from the GFS model via <a href="https://open-meteo.com/" style="color:var(--accent)">Open-Meteo</a> (CC BY 4.0). The map refreshes itself every few minutes. The pill at the top says how old the newest data is (green is fresh, amber is getting old, red means the feed has stalled), and you can tap it to refresh right away. It's for curiosity and context, not flight planning.</p>
   </div>
@@ -1437,7 +1435,7 @@ const WIND_COLS = ["#ff4d4d", "#ff8a3d", "#f7c948", "#5fd1c1", "#7f93a3"];
 let windLvl = "250";
 try{ const l = localStorage.getItem("windLvl"); if(WIND_LEVELS[l]) windLvl = l; }catch(e){}
 const windColor = kt => { const st = WIND_LEVELS[windLvl].steps, i = st.findIndex(x => kt >= x); return WIND_COLS[i < 0 ? 4 : i]; };
-const windPoints = () => (windData.levels && windData.levels[windLvl]) || (windLvl === "250" ? windData.points : null);
+const windPoints = () => (windData.levels && windData.levels[windLvl]) || (windLvl === "250" ? windData.points : null);  // older files only had 34,000 ft
 function windIndex(){
   if(!windData || !windData.times) return -1;
   const now = Date.now();
@@ -1639,7 +1637,7 @@ function windKeyRows(){
 }
 function placeWindAlt(){
   const el = $("windAlt"), rail = el.querySelector(".wa-rail"), top = rail.offsetTop, h = rail.offsetHeight;
-  const ys = WA_ORDER.map((_, i) => top + 8 + i * (h - 16) / 2);
+  const ys = WA_ORDER.map((_, i) => top + i * h / 2);
   el.querySelectorAll(".wa-det").forEach((b, i) => { b.style.top = ys[i] + "px"; b.classList.toggle("sel", b.dataset.lvl === windLvl); });
   el.querySelector(".wa-thumb").style.top = ys[WA_ORDER.indexOf(windLvl)] + "px";
   el.setAttribute("aria-valuenow", WA_ORDER.indexOf(windLvl)); el.setAttribute("aria-valuetext", WIND_LEVELS[windLvl].name);

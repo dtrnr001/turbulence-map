@@ -79,28 +79,36 @@ WINDS_MAX_AGE_H = 3
 LIVE_WINDS = "https://dtrnr001.github.io/turbulence-map/winds.json"
 
 
+# Wind levels: key in winds.json -> Open-Meteo variable suffix
+WIND_LEVELS = {"250": "250hPa", "700": "700hPa", "sfc": "10m"}
+
+
 def write_winds(site):
-    """Jet-stream level (250 hPa, about 34,000 ft) winds on a 3-degree grid from
-    Open-Meteo (free, non-commercial, CC BY 4.0). Refetched only every few hours
-    to stay well inside the free daily limit; otherwise the live copy is reused."""
+    """Winds at three altitudes on a 3-degree grid from Open-Meteo's GFS
+    (free, non-commercial, CC BY 4.0): 250 hPa (about 34,000 ft), 700 hPa
+    (about 10,000 ft) and 10 m above the ground. Refetched only every few
+    hours to stay well inside the free daily limit; otherwise the live copy
+    is reused."""
     out = site / "winds.json"
     try:
         with urllib.request.urlopen(urllib.request.Request(LIVE_WINDS, headers={"User-Agent": UA}), timeout=20) as r:
             prev = json.loads(r.read())
         age_h = (datetime.now(timezone.utc) - datetime.fromisoformat(prev["fetchedAt"])).total_seconds() / 3600
-        if age_h < WINDS_MAX_AGE_H:
+        if age_h < WINDS_MAX_AGE_H and set(prev.get("levels", {})) == set(WIND_LEVELS):
             out.write_text(json.dumps(prev, separators=(",", ":")))
             print(f"reused winds from {age_h:.1f} h ago")
             return
     except Exception as e:
         print(f"no reusable winds ({e})")
     grid = [(lat, lon) for lat in range(24, 52, 3) for lon in range(-126, -64, 3)]
-    points, times = [], None
+    hourly = ",".join(f"wind_{v}_{suf}" for suf in WIND_LEVELS.values() for v in ("speed", "direction"))
+    levels, times = {k: [] for k in WIND_LEVELS}, None
+    rnd = lambda a: [None if x is None else round(x) for x in a]  # whole knots and degrees keep the file small
     for i in range(0, len(grid), 60):
         chunk = grid[i:i + 60]
         q = urllib.parse.urlencode({
             "latitude": ",".join(str(a) for a, _ in chunk), "longitude": ",".join(str(b) for _, b in chunk),
-            "hourly": "wind_speed_250hPa,wind_direction_250hPa", "wind_speed_unit": "kn",
+            "hourly": hourly, "wind_speed_unit": "kn",
             "forecast_days": 2, "timezone": "UTC",
         })
         try:
@@ -114,14 +122,16 @@ def write_winds(site):
         for (lat, lon), row in zip(chunk, rows):
             h = row["hourly"]
             times = times or h["time"]
-            points.append([lat, lon, h["wind_speed_250hPa"], h["wind_direction_250hPa"]])
+            for k, suf in WIND_LEVELS.items():
+                levels[k].append([lat, lon, rnd(h[f"wind_speed_{suf}"]), rnd(h[f"wind_direction_{suf}"])])
         time.sleep(1)
     out.write_text(json.dumps({
         "fetchedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "level": "250 hPa (about 34,000 ft)", "model": "GFS via Open-Meteo",
-        "times": times, "points": points,
+        "model": "GFS via Open-Meteo",
+        "levelNames": {"250": "250 hPa (about 34,000 ft)", "700": "700 hPa (about 10,000 ft)", "sfc": "10 m above ground"},
+        "times": times, "levels": levels,
     }, separators=(",", ":")))
-    print(f"wrote winds for {len(points)} grid points")
+    print(f"wrote winds at {len(levels)} levels for {len(grid)} grid points")
 
 
 def main(out):
