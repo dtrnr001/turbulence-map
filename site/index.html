@@ -135,6 +135,19 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
 .ticks span.end::before{display:none}
 #altLbl{color:var(--text);font-weight:600}
 
+/* ---------- wind altitude slider: slides in on the right while the wind key is open ---------- */
+#windAlt{position:fixed;z-index:1150;right:12px;top:50%;margin-top:-105px;height:210px;width:104px;padding:10px 10px 10px 8px;
+  border-radius:14px;transition:transform .2s ease,opacity .2s ease;touch-action:none;-webkit-user-select:none;user-select:none}
+#windAlt.off{transform:translateX(130%);opacity:0;pointer-events:none}
+#windAlt h6{margin:0 0 4px;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:right}
+.wa-rail{position:absolute;right:20px;top:34px;bottom:20px;width:4px;border-radius:2px;background:#2b3741}
+.wa-det{position:absolute;right:0;left:0;height:44px;margin-top:-22px;display:flex;align-items:center;justify-content:flex-end;gap:0;padding:0 39px 0 0;background:none;border:none;color:var(--muted);font-size:10.5px;line-height:1.15;text-align:right;cursor:pointer}
+.wa-det b{display:block;color:var(--text);font-size:12px;font-weight:600}
+.wa-det::after{content:"";position:absolute;right:16px;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;background:#182027;border:2px solid #55636e;box-sizing:border-box}
+.wa-det.sel b{color:var(--accent)}
+.wa-thumb{position:absolute;right:11px;width:22px;height:22px;margin-top:-11px;border-radius:50%;background:#e6edf2;border:3px solid var(--accent);box-shadow:0 2px 8px #0008;transition:top .15s ease;pointer-events:none}
+#windAlt.drag .wa-thumb{transition:none}
+.lyr .alt{color:var(--muted);font-size:11px;margin-left:3px}
 /* ---------- flight timeline bar (bottom of the screen when a route is set) ---------- */
 #tl{left:356px;right:60px;bottom:22px;max-width:780px;margin:0 auto;padding:7px 12px 6px}
 #tl[hidden]{display:none}
@@ -201,6 +214,7 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   .lyr input{width:16px;height:16px}
   .lyr label{padding:8px 0}
   .tltrack{margin:2px 10px 0}
+  #windAlt{right:8px;width:96px;margin-top:0;top:auto;bottom:var(--wab, 260px)}
   .tlfun{font-size:13px}
   .tlfun input{width:18px;height:18px}
   #left .drawer{position:fixed;left:0;right:0;bottom:0;z-index:1200;max-height:72vh;border-radius:16px 16px 0 0;padding:6px 16px calc(16px + env(safe-area-inset-bottom));transition:transform .2s}
@@ -286,13 +300,21 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
   <button id="resetF" class="link resetf" hidden>Reset filters</button>
   </div>
 </div>
+<div class="panel off" id="windAlt" role="slider" aria-label="Wind altitude" aria-valuemin="0" aria-valuemax="2" tabindex="0">
+  <h6>Altitude</h6>
+  <div class="wa-rail"></div>
+  <button class="wa-det" data-lvl="250"><span><b>34,000 ft</b>Jet stream</span></button>
+  <button class="wa-det" data-lvl="700"><span><b>10,000 ft</b>Climb</span></button>
+  <button class="wa-det" data-lvl="sfc"><span><b>Surface</b>Ground</span></button>
+  <div class="wa-thumb"></div>
+</div>
 <div class="panel" id="legend">
   <div class="lyrs">
     <div class="lyr"><label><input type="checkbox" id="ovPireps" checked>Pilot reports</label></div>
     <div class="lyr"><label><input type="checkbox" id="ovGairmet">Hazard forecasts (US)</label></div>
     <div class="lyr"><label><input type="checkbox" id="ovIsigmet">Severe warnings</label></div>
     <div class="lyr"><label><input type="checkbox" id="qtRadar">Radar</label></div>
-    <div class="lyr"><label><input type="checkbox" id="qtWinds">Wind</label></div>
+    <div class="lyr"><label><input type="checkbox" id="qtWinds">Wind<span class="alt" id="windAltTag"></span></label></div>
   </div>
   <div class="keys">
     <div class="key" data-box="ovPireps"><h5>Pilot reports</h5>
@@ -319,7 +341,7 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
         <div><span class="bar" style="background:#f7c948"></span>90+ kt</div>
         <div><span class="bar" style="background:#5fd1c1"></span>60+ kt</div>
         <div><span class="bar" style="background:#7f93a3"></span>Under 60</div>
-      </div><p class="kinfo">At 34,000 ft</p>
+      </div><p class="kinfo" id="windInfo">At 34,000 ft</p>
     </div>
     <div class="key" data-box="ovGairmet"><h5>Hazard forecasts</h5>
       <div class="kchips" id="keyGairmet"></div><p class="kinfo" id="infoGairmet"></p>
@@ -1405,7 +1427,17 @@ map.getPane("winds").style.pointerEvents = "none";
 map.getPane("winds").style.pointerEvents = "none";
 let windData = null;
 
-const windColor = kt => kt >= 150 ? "#ff4d4d" : kt >= 120 ? "#ff8a3d" : kt >= 90 ? "#f7c948" : kt >= 60 ? "#5fd1c1" : "#7f93a3";
+// three altitudes, each with its own color steps (surface wind is much lighter than the jet stream)
+const WIND_LEVELS = {
+  "250": {name: "34,000 ft", tag: "34k", steps: [150, 120, 90, 60], speed: 1},
+  "700": {name: "10,000 ft", tag: "10k", steps: [80, 60, 40, 20], speed: 1.8},
+  "sfc": {name: "the surface", tag: "sfc", steps: [40, 30, 20, 10], speed: 3.5},
+};
+const WIND_COLS = ["#ff4d4d", "#ff8a3d", "#f7c948", "#5fd1c1", "#7f93a3"];
+let windLvl = "250";
+try{ const l = localStorage.getItem("windLvl"); if(WIND_LEVELS[l]) windLvl = l; }catch(e){}
+const windColor = kt => { const st = WIND_LEVELS[windLvl].steps, i = st.findIndex(x => kt >= x); return WIND_COLS[i < 0 ? 4 : i]; };
+const windPoints = () => (windData.levels && windData.levels[windLvl]) || (windLvl === "250" ? windData.points : null);
 function windIndex(){
   if(!windData || !windData.times) return -1;
   const now = Date.now();
@@ -1420,7 +1452,8 @@ function buildWindGrid(){
   windGrid = null;
   const i = windIndex();
   if(i < 0) return;
-  const pts = windData.points, lats = [...new Set(pts.map(p => p[0]))].sort((a,b) => a-b), lons = [...new Set(pts.map(p => p[1]))].sort((a,b) => a-b);
+  const pts = windPoints(); if(!pts) return;
+  const lats = [...new Set(pts.map(p => p[0]))].sort((a,b) => a-b), lons = [...new Set(pts.map(p => p[1]))].sort((a,b) => a-b);
   const idx = new Map(pts.map(p => [p[0] + "," + p[1], p]));
   const u = [], v = [];
   for(const la of lats){
@@ -1480,7 +1513,7 @@ const WindCanvas = L.Layer.extend({
       const w = windAt(ll.lat, ((ll.lng + 180) % 360 + 360) % 360 - 180);
       if(!w){ this._field[r * cols + q] = null; continue; }
       const ang = w.to * Math.PI / 180;
-      this._field[r * cols + q] = {dx: Math.sin(ang), dy: -Math.cos(ang), kt: w.kt, col: windColor(w.kt)};
+      this._field[r * cols + q] = {dx: Math.sin(ang), dy: -Math.cos(ang), kt: w.kt, col: windColor(w.kt), faint: w.kt < WIND_LEVELS[windLvl].steps[3], v: 6 + w.kt * WIND_LEVELS[windLvl].speed * .22};
       this._cells.push(r * cols + q);
     }
     // Arrows come out of "streams": each stream releases an arrow every ~0.5 s from one spot,
@@ -1532,7 +1565,7 @@ const WindCanvas = L.Layer.extend({
       const f = this._at(p.x, p.y);
       p.age += dt;
       if(!f || p.age > p.life || p.x < -10 || p.y < -10 || p.x > this._w + 10 || p.y > this._h + 10) continue;
-      const v = 6 + f.kt * .22;                 // pixels per second: 100 kt ≈ 28 px/s
+      const v = f.v;                            // pixels per second: 100 kt at 34,000 ft ≈ 28 px/s
       p.x += f.dx * v * dt; p.y += f.dy * v * dt; p.f = f;
       keep.push(p);
     }
@@ -1553,9 +1586,9 @@ const WindCanvas = L.Layer.extend({
       if(!f) continue;
       // fade in and out so arrows don't pop
       const fade = still ? 1 : Math.min(1, p.age / .6, (p.life - p.age) / .6);
-      ctx.globalAlpha = Math.max(0, fade) * (f.kt < 60 ? .3 : .55);
+      ctx.globalAlpha = Math.max(0, fade) * (f.faint ? .3 : .55);
       ctx.strokeStyle = f.col;
-      const len = Math.min(7, 4 + f.kt / 40), hl = 2.4, px = -f.dy, py = f.dx;
+      const len = Math.min(7, 4 + f.kt * WIND_LEVELS[windLvl].speed / 40), hl = 2.4, px = -f.dy, py = f.dx;
       const hx = p.x + f.dx * len / 2, hy = p.y + f.dy * len / 2;
       ctx.beginPath();
       ctx.moveTo(p.x - f.dx * len / 2, p.y - f.dy * len / 2); ctx.lineTo(hx, hy);
@@ -1595,6 +1628,46 @@ $("qtWinds").onchange = setWinds;
 setRadar(); setWinds();
 // radar tiles change every 5 minutes; winds every few hours
 setInterval(() => { if($("qtRadar").checked) refreshRadar(); if($("qtWinds").checked) loadWinds(); }, 5 * 60 * 1000);
+// ---------- wind altitude: a slim slider on the right, shown only while the wind key is open ----------
+const WA_ORDER = ["250", "700", "sfc"];
+function windKeyRows(){
+  const st = WIND_LEVELS[windLvl].steps;
+  $("windKey").innerHTML = st.map((x, i) => `<div><span class="bar" style="background:${WIND_COLS[i]}"></span>${x}+ kt</div>`).join("")
+    + `<div><span class="bar" style="background:${WIND_COLS[4]}"></span>Under ${st[3]}</div>`;
+  $("windInfo").textContent = "At " + WIND_LEVELS[windLvl].name;
+  $("windAltTag").textContent = WIND_LEVELS[windLvl].tag;
+}
+function placeWindAlt(){
+  const el = $("windAlt"), rail = el.querySelector(".wa-rail"), top = rail.offsetTop, h = rail.offsetHeight;
+  const ys = WA_ORDER.map((_, i) => top + 8 + i * (h - 16) / 2);
+  el.querySelectorAll(".wa-det").forEach((b, i) => { b.style.top = ys[i] + "px"; b.classList.toggle("sel", b.dataset.lvl === windLvl); });
+  el.querySelector(".wa-thumb").style.top = ys[WA_ORDER.indexOf(windLvl)] + "px";
+  el.setAttribute("aria-valuenow", WA_ORDER.indexOf(windLvl)); el.setAttribute("aria-valuetext", WIND_LEVELS[windLvl].name);
+  return ys;
+}
+function setWindLvl(l){
+  if(!WIND_LEVELS[l]) return;
+  const changed = l !== windLvl; windLvl = l;
+  try{ localStorage.setItem("windLvl", l); }catch(e){}
+  windKeyRows(); placeWindAlt();
+  if(!$("qtWinds").checked){ $("qtWinds").checked = true; setWinds(); syncKeys(); }  // picking an altitude turns the wind on
+  else if(changed) drawWinds();
+  if(changed && navigator.vibrate) navigator.vibrate(8);
+}
+{ // drag anywhere on the slider; it snaps to the nearest of the three altitudes
+  const el = $("windAlt"); let dragging = false;
+  const nearest = y => { const ys = placeWindAlt(), r = el.getBoundingClientRect(); let b = 0; ys.forEach((v, i) => { if(Math.abs(y - r.top - v) < Math.abs(y - r.top - ys[b])) b = i; }); return WA_ORDER[b]; };
+  el.addEventListener("pointerdown", e => { dragging = true; el.classList.add("drag"); el.setPointerCapture(e.pointerId); setWindLvl(nearest(e.clientY)); e.preventDefault(); });
+  el.addEventListener("pointermove", e => { if(dragging) setWindLvl(nearest(e.clientY)); });
+  ["pointerup", "pointercancel"].forEach(t => el.addEventListener(t, () => { dragging = false; el.classList.remove("drag"); }));
+  el.addEventListener("keydown", e => { const i = WA_ORDER.indexOf(windLvl); if(e.key === "ArrowUp") setWindLvl(WA_ORDER[Math.max(0, i - 1)]); if(e.key === "ArrowDown") setWindLvl(WA_ORDER[Math.min(2, i + 1)]); });
+}
+// on phones it sits just above whatever is at the bottom (the panel, or the flight timeline)
+function placeWindAltBox(){
+  const lg = $("legend").getBoundingClientRect(), tl = $("tl"), t = tl && !tl.hidden ? tl.getBoundingClientRect().top : lg.top;
+  document.documentElement.style.setProperty("--wab", `${Math.round(innerHeight - Math.min(lg.top, t) + 12)}px`);
+}
+windKeyRows(); placeWindAlt();
 
 function schedule(){
   clearInterval(timer); timer = null;
@@ -1633,6 +1706,8 @@ function syncKeys(){
     document.querySelector(`.key[data-box="${box.id}"]`).hidden = !open;
   });
   document.querySelector(".knone").hidden = !!keyOpen;
+  if(typeof placeWindAltBox === "function") placeWindAltBox();
+  $("windAlt").classList.toggle("off", keyOpen !== "qtWinds");
 }
 // on phones the key column is as tall as the checkbox panel plus the buttons under it
 function sizeKeyCol(){
