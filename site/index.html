@@ -553,6 +553,75 @@ const cToF = c => Math.round(c*9/5+32);
 // ---------- map ----------
 const map = L.map("map", {zoomControl:false, worldCopyJump:true}).setView([39, -97], matchMedia("(max-width:600px)").matches ? 3 : 4);
 L.control.zoom({position:"topright"}).addTo(map);
+
+// One-finger zoom (like Google Maps): tap, then tap again, hold and slide
+// down to zoom in or up to zoom out, around the spot you tapped. A plain
+// double tap still zooms in one step, and two-finger pinch is unchanged.
+(function oneFingerZoom(){
+  const el = map.getContainer();
+  const PX_PER_LEVEL = 120, TAP_MS = 300, TAP_PX = 30, START_PX = 8;
+  let lastTap = null;   // {t, x, y} of the previous quick tap on the map
+  let down = null;      // the finger currently touching
+  let g = null;         // the armed or active zoom gesture
+  let blockClicksUntil = 0;
+  const onMap = e => el.contains(e.target) && !e.target.closest(".leaflet-control, .leaflet-popup");
+  const centerFor = (ll, p, z) => map.unproject(map.project(ll, z).subtract(p.subtract(map.getSize()._divideBy(2))), z);
+
+  window.addEventListener("pointerdown", e => {
+    if(e.pointerType !== "touch") return;
+    if(!e.isPrimary || !onMap(e)){ end(); lastTap = null; down = null; return; }
+    down = {id:e.pointerId, t:Date.now(), x:e.clientX, y:e.clientY};
+    if(lastTap && down.t - lastTap.t < TAP_MS && Math.hypot(e.clientX-lastTap.x, e.clientY-lastTap.y) < TAP_PX){
+      const r = el.getBoundingClientRect();
+      const p = L.point(e.clientX - r.left, e.clientY - r.top);
+      g = {id:e.pointerId, y0:e.clientY, z0:map.getZoom(), p, ll:map.containerPointToLatLng(p), active:false, zoom:map.getZoom()};
+    }
+    lastTap = null;
+  }, true);
+
+  window.addEventListener("pointermove", e => {
+    if(!g || e.pointerId !== g.id) return;
+    e.stopImmediatePropagation();   // keep the map from panning while this finger zooms
+    const dy = e.clientY - g.y0;
+    if(!g.active){
+      if(Math.abs(dy) < START_PX) return;
+      g.active = true;
+      map._stop(); map._moveStart(true, false);
+    }
+    const z = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), g.z0 + dy / PX_PER_LEVEL));
+    const center = centerFor(g.ll, g.p, z);
+    g.zoom = z;
+    cancelAnimationFrame(g.raf);
+    g.raf = requestAnimationFrame(() => map._move(center, z, {pinch:true, round:false}));
+  }, true);
+
+  function end(){
+    if(!g) return;
+    const was = g; g = null;
+    if(!was.active) return;
+    cancelAnimationFrame(was.raf);
+    blockClicksUntil = Date.now() + 500;
+    const z = map._limitZoom(Math.round(was.zoom));
+    const center = centerFor(was.ll, was.p, z);
+    if(map.options.zoomAnimation) map._animateZoom(center, z, true, map.options.zoomSnap);
+    else map._resetView(center, z);
+  }
+  window.addEventListener("pointerup", e => {
+    if(e.pointerType !== "touch") return;
+    const wasZoom = g && g.active && e.pointerId === g.id;
+    if(g && e.pointerId === g.id) end();
+    if(down && e.pointerId === down.id && !wasZoom && Date.now() - down.t < TAP_MS
+       && Math.hypot(e.clientX-down.x, e.clientY-down.y) < TAP_PX && onMap(e)){
+      lastTap = {t:Date.now(), x:e.clientX, y:e.clientY};
+    }
+    down = null;
+  }, true);
+  window.addEventListener("pointercancel", e => { if(g && e.pointerId === g.id) end(); down = null; lastTap = null; }, true);
+  // After a slide-zoom, swallow any click or double-click the browser still sends.
+  for(const type of ["click", "dblclick"]){
+    window.addEventListener(type, e => { if(Date.now() < blockClicksUntil){ e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  }
+})();
 // Standard OpenStreetMap tiles (no key needed), darkened with a CSS filter.
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 10, className: "dark-tiles",
