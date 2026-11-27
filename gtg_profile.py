@@ -7,9 +7,11 @@ forecast hour is about 165 MB, far too big for a phone, so this script:
   * picks the newest run whose forecast hours are all posted,
   * downloads only the "EDPARM" (all turbulence sources combined) records,
     using the .idx inventory and one HTTP byte-range request per hour,
-  * shrinks each level onto a 0.5 degree grid, keeping the *strongest*
-    value in each box so small patches are not smoothed away,
-  * writes site/gtg.json with one short text string per forecast hour.
+  * shrinks each level onto a 0.5 degree grid (about 30 miles), keeping a
+    high percentile of the 3 km points in each box so rough patches stay
+    visible without one tiny speck painting the whole box,
+  * writes site/gtg.json with one short text string per forecast hour (one
+    intensity category per box and level, about 16 KB gzipped per hour).
 
 Altitudes in GTG are heights above mean sea level (not flight levels).
 """
@@ -24,8 +26,12 @@ HOURS = 10              # forecast valid times kept: the current hour plus the n
 LEVEL_STEP_FT = 1000    # every GTG level from the surface ...
 TOP_FT = 45000          # ... up to 45,000 ft
 LAT0, LAT1, LON0, LON1, D = 24.0, 50.0, -126.0, -65.0, 0.5
-EDR_STEP = 0.02         # stored as a single character: value // 0.02
-CODES = "0123456789abcdefghijklmnopqrstuvwxyz"   # '.' = no data
+# EDR -> category for a medium-size airliner (the thresholds NOAA's GTG
+# displays use): 0 smooth < 0.15, 1 light, 2 moderate >= 0.22,
+# 3 severe >= 0.34, 4 extreme >= 0.45. One character per box; '.' = no data.
+AGG = 0.9               # per 0.5 degree box: 90th percentile of the 3 km points ("max" = strongest point)
+CATS = [0.15, 0.22, 0.34, 0.45]
+CAT_NAMES = ["smooth", "light", "moderate", "severe", "extreme"]
 
 
 def _get(url, rng=None, tries=3):
@@ -79,7 +85,7 @@ def write_gtg(site):
 
     nlat, nlon = round((LAT1 - LAT0) / D), round((LON1 - LON0) / D)
     levels = list(range(0, TOP_FT + 1, LEVEL_STEP_FT))
-    order = starts = cells = None
+    order = starts = cells = counts = sb_sorted = None
     hours = []
     t0 = time.time()
     for fh in fhs:
@@ -116,24 +122,30 @@ def write_gtg(site):
                 sb = box[order]
                 first = np.searchsorted(sb, 0)
                 order, sb = order[first:], sb[first:]
-                cells, starts = np.unique(sb, return_index=True)
-            cols[k, cells] = np.maximum.reduceat(v[order], starts)
+                cells, starts, counts = np.unique(sb, return_index=True, return_counts=True)
+                sb_sorted = sb
+            if AGG == "max":
+                cols[k, cells] = np.maximum.reduceat(v[order], starts)
+            else:  # a high percentile: rough patches still show, single 3 km specks don't paint a whole box
+                vs = v[order]
+                srt = np.lexsort((vs, sb_sorted))
+                cols[k, cells] = vs[srt][starts + np.floor(AGG * (counts - 1)).astype(int)]
             # a box only counts if it has data: native points outside the GTG domain are -1
-        q = np.where(cols < 0, -1, np.minimum(len(CODES) - 1, np.floor(cols / EDR_STEP + 1e-6))).astype(int)
-        q[(q >= 0) & (q < 4)] = 0       # below 0.08 is smooth air for every aircraft size
-        lut = np.array(list(CODES + "."))
+        q = np.where(cols < 0, 5, np.digitize(cols, CATS))
+        lut = np.array(list("01234."))
         s = "".join(lut[q.T.ravel()])   # box by box, each box listing its levels bottom to top
         valid = run + timedelta(hours=fh)
-        hours.append({"valid": valid.strftime("%Y-%m-%dT%H:%MZ"), "fh": fh, "edr": s})
+        hours.append({"valid": valid.strftime("%Y-%m-%dT%H:%MZ"), "fh": fh, "cat": s})
         print(f"GTG f{fh:03d}: {len(blob)/1e6:.0f} MB in, {len(s)/1e3:.0f} k chars out ({time.time()-t0:.0f}s)")
     data = {
         "source": "NOAA/NWS NCEP Graphical Turbulence Guidance (GTG v4), DAFS 3 km CONUS",
         "run": run.strftime("%Y-%m-%dT%H:%MZ"),
         "fetchedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "field": "EDPARM: eddy dissipation rate, all turbulence sources (m^2/3 s^-1), strongest value in each box",
+        "field": "EDPARM: eddy dissipation rate, all turbulence sources (m^2/3 s^-1)",
+        "boxValue": "strongest 3 km point" if AGG == "max" else f"{round(AGG * 100)}th percentile of the 3 km points",
         "altitude": "feet above mean sea level",
         "grid": {"lat0": LAT0, "lon0": LON0, "d": D, "nlat": nlat, "nlon": nlon},
-        "levelsFt": levels, "edrStep": EDR_STEP, "codes": CODES, "missing": ".",
+        "levelsFt": levels, "categories": CAT_NAMES, "edrFrom": CATS, "aircraft": "medium (airliner-size)", "missing": ".",
         "hours": hours,
     }
     txt = json.dumps(data, separators=(",", ":"))
