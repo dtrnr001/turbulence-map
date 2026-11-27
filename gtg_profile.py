@@ -81,6 +81,14 @@ def write_gtg(site):
         return _reuse(out, None)
     if _reuse(out, run):
         return
+    try:
+        _build(out, run, url, hh, fhs)
+    except Exception as e:
+        print(f"GTG: couldn't build run {run:%H}Z ({e}); keeping the previous forecast", file=sys.stderr)
+        _reuse(out, None)
+
+
+def _build(out, run, url, hh, fhs):
     import numpy as np, pygrib  # only needed when there's a new run to process
 
     nlat, nlon = round((LAT1 - LAT0) / D), round((LON1 - LON0) / D)

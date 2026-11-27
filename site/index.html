@@ -210,6 +210,9 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
 @media (max-width:600px){
   #prof{left:0;right:0;bottom:0;max-width:none;border-radius:16px 16px 0 0;padding:8px 10px calc(10px + env(safe-area-inset-bottom));max-height:78vh;overflow-y:auto}
   .pfctl select{font-size:16px;padding:4px}
+  .pfctl{margin:4px 0 3px}
+  .pfkey{font-size:10px;gap:2px 7px;margin-left:0}
+  .pfkey i{width:8px;height:8px}
 }
 @media (max-width:600px){
   #left{top:calc(10px + env(safe-area-inset-top));left:10px;width:auto;max-width:calc(100vw - 180px);z-index:auto}
@@ -397,7 +400,7 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
 
 <div class="panel" id="prof" role="dialog" aria-labelledby="profTitle" hidden>
   <div class="pfhead">
-    <h3 id="profTitle">Flight profile <span id="profRoute"></span><small>Estimated scenario: side view of your route with NOAA's turbulence forecast</small></h3>
+    <h3 id="profTitle">Flight profile <span id="profRoute"></span><small>Estimated scenario<span class="lf">: side view of your route with NOAA's turbulence forecast</span></small></h3>
     <button id="profClose" aria-label="Close the flight profile">×</button>
   </div>
   <div class="pfctl">
@@ -409,7 +412,7 @@ button.link{background:none;border:none;color:var(--accent);padding:2px 0;font-s
     <div class="pfaxis" id="profAxis" aria-hidden="true"></div>
     <div class="pfscroll" id="profScroll"><canvas id="profCv" role="img" aria-label="Side view of the flight"></canvas></div>
   </div>
-  <div class="pfkey"><span><i style="background:var(--lgt)"></i>Light</span><span><i style="background:var(--mod)"></i>Moderate</span><span><i style="background:var(--sev)"></i>Severe</span><span><i style="background:var(--extm)"></i>Extreme</span><span><i class="na"></i>No forecast</span><span><i style="background:#fff;height:2px;vertical-align:3px"></i>Your path</span></div>
+  <div class="pfkey"><span><i style="background:var(--lgt);opacity:.45"></i>Light</span><span><i style="background:var(--mod)"></i>Moderate</span><span><i style="background:var(--sev)"></i>Severe</span><span><i style="background:var(--extm)"></i>Extreme</span><span><i class="na"></i>No forecast</span><span><i style="background:#2c2a26;border:1px solid #4a453d;box-sizing:border-box"></i>Ground</span><span><i style="background:#fff;height:2px;vertical-align:3px"></i>Your path (dim: no forecast)</span></div>
   <div id="profSum" aria-live="polite"></div>
   <div id="profNote"></div>
   <details id="profFine"><summary>Assumptions and data</summary><p id="profFineTxt"></p></details>
@@ -1512,7 +1515,8 @@ function buildProfile(){
     leg.pts.forEach((p, j) => {
       const m = s + j / n * d, t = dep + m * 60000, cats = [];
       for(let k = 0; k < nl; k++) cats.push(gtgAt(p[0], p[1], k * 1000, t));
-      cols.push({m, t, lat: p[0], lon: p[1], leg: i, cats, ft: pathFt(m, s, d, cruise)});
+      const first = cats.findIndex(v => v !== null);
+      cols.push({m, t, lat: p[0], lon: p[1], leg: i, cats, ground: first > 0 && first < 15 ? first : 0, ft: pathFt(m, s, d, cruise)});
     });
   });
   PF.cols = cols; PF.plan = plan; PF.dep = dep; PF.cruise = cruise;
@@ -1520,7 +1524,7 @@ function buildProfile(){
 
 function drawProfile(){
   const cv = $("profCv"), sc = $("profScroll"), plan = PF.plan, T = plan.total;
-  const phone = isPhone(), H = phone ? 190 : 220;
+  const phone = isPhone(), H = phone ? 170 : 220;
   const W = Math.max(sc.clientWidth || 300, Math.round(T * (phone ? 2.2 : 2.6)));
   const dpr = devicePixelRatio || 1;
   cv.width = W * dpr; cv.height = (H + 26) * dpr; cv.style.width = W + "px"; cv.style.height = (H + 26) + "px";
@@ -1535,21 +1539,23 @@ function drawProfile(){
   // altitude grid lines
   g.strokeStyle = "#202b33"; g.lineWidth = 1;
   for(let ft = 5000; ft <= top; ft += 5000){ g.beginPath(); g.moveTo(0, Y(ft) + .5); g.lineTo(W, Y(ft) + .5); g.stroke(); }
-  // turbulence cells
+  // turbulence cells: solid colors pre-mixed with the background so neighbouring boxes don't leave seams
+  const mix = (hex, a) => { const n = parseInt(hex.replace("#", ""), 16), bg = [15, 20, 24];
+    return `rgb(${[(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v, i) => Math.round(v * a + bg[i] * (1 - a))).join(",")})`; };
+  const fills = GTG_RANK.map((r, v) => v ? mix(color(r), v === 1 ? .32 : .85) : null);
   const cols = PF.cols, nl = cols[0] ? cols[0].cats.length : 0;
   cols.forEach((c, ci) => {
     const prev = cols[ci - 1], next = cols[ci + 1];
-    const x0 = prev && prev.leg === c.leg ? (X(prev.m) + X(c.m)) / 2 : X(c.m);
-    const x1 = next && next.leg === c.leg ? (X(next.m) + X(c.m)) / 2 : X(c.m) + 1;
+    const x0 = Math.round(prev && prev.leg === c.leg ? (X(prev.m) + X(c.m)) / 2 : X(c.m));
+    const x1 = Math.round(next && next.leg === c.leg ? (X(next.m) + X(c.m)) / 2 : X(c.m) + 1);
     for(let k = 0; k < nl; k++){
       const ft0 = Math.max(0, k * 1000 - 500), ft1 = Math.min(top, k * 1000 + 500), v = c.cats[k];
       if(ft0 >= top) break;
-      if(v === null){ g.fillStyle = hatch; g.globalAlpha = 1; }
-      else if(v === 0) continue;
-      else { g.fillStyle = color(GTG_RANK[v]); g.globalAlpha = v === 1 ? .55 : .8; }
-      g.fillRect(x0, Y(ft1), x1 - x0 + .6, Y(ft0) - Y(ft1) + .6);
+      if(v === 0) continue;
+      g.fillStyle = k < c.ground ? "#2c2a26" : v === null ? hatch : fills[v];
+      const y0 = Math.round(Y(ft1)), y1 = Math.round(Y(ft0));
+      g.fillRect(x0, y0, Math.max(1, x1 - x0), y1 - y0);
     }
-    g.globalAlpha = 1;
   });
   // layovers
   plan.legs.forEach(({s, d, i}) => {
@@ -1568,9 +1574,10 @@ function drawProfile(){
     const a = cols[ci - 1], b = cols[ci];
     if(a.leg !== b.leg) continue;
     const va = a.cats[Math.round(a.ft / 1000)], vb = b.cats[Math.round(b.ft / 1000)], v = Math.max(va ?? 0, vb ?? 0);
-    g.strokeStyle = v ? color(GTG_RANK[v]) : "#ffffff"; g.lineWidth = v ? 4.5 : 2.2; g.lineCap = "round";
-    if(!v && (va === null || vb === null)) g.setLineDash([2, 4]);
-    g.beginPath(); g.moveTo(X(a.m), Y(a.ft)); g.lineTo(X(b.m), Y(b.ft)); g.stroke(); g.setLineDash([]);
+    // dimmed where there's no forecast to check against
+    const gone = (c, x) => x === null && Math.round(c.ft / 1000) >= c.ground;
+    g.strokeStyle = v ? color(GTG_RANK[v]) : (gone(a, va) || gone(b, vb)) ? "#ffffff70" : "#ffffff"; g.lineWidth = v >= 2 ? 4.5 : v ? 3 : 2.2; g.lineCap = "round";
+    g.beginPath(); g.moveTo(X(a.m), Y(a.ft)); g.lineTo(X(b.m), Y(b.ft)); g.stroke();
   }
   // selected spot
   if(PF.sel){
@@ -1595,19 +1602,19 @@ function drawProfile(){
   $("profAxis").style.height = H + "px"; $("profAxis").innerHTML = ax.join("") + `<span style="top:${H + 14}px">ft</span>`;
 }
 
-// Stretches of the path inside forecast turbulence, plus strong patches close above or below the cruise
+// Stretches of the path inside forecast turbulence, leg by leg, plus strong patches close above or below the cruise
 function profileSummary(){
   const cols = PF.cols, runs = [];
   let cur = null;
   cols.forEach(c => {
     const v = c.cats[Math.round(c.ft / 1000)];
-    if(v >= 1 && cur && cur.leg === c.leg && c.m - cur.b < 12){ cur.b = c.m; cur.v = Math.max(cur.v, v); }
+    if(v >= 1 && cur && cur.leg === c.leg && cur.v === v && c.m - cur.b < 8) cur.b = c.m;
     else if(v >= 1){ cur = {a: c.m, b: c.m, v, leg: c.leg}; runs.push(cur); }
   });
   const near = [];
   cols.forEach(c => {
     if(c.ft !== PF.cruise || c.cats[c.ft / 1000] >= 1) return;
-    for(const dk of [1, -1, 2, -2, 3, -3, 4, -4]){
+    for(const dk of [1, -1, 2, -2, 3, -3]){
       const v = c.cats[c.ft / 1000 + dk];
       if(v >= 2){ const last = near[near.length - 1];
         if(last && last.leg === c.leg && c.m - last.b < 15 && Math.sign(last.dk) === Math.sign(dk)){ last.b = c.m; last.v = Math.max(last.v, v); last.dk = Math.abs(dk) < Math.abs(last.dk) ? dk : last.dk; }
@@ -1615,16 +1622,41 @@ function profileSummary(){
         break; }
     }
   });
-  const unknown = cols.filter(c => c.cats[Math.round(c.ft / 1000)] === null).length / Math.max(1, cols.length);
-  const span = r => r.b - r.a < 4 ? `around ${fmtDur(r.a)} in` : `from about ${fmtDur(r.a)} to ${fmtDur(r.b)} in`;
-  const legName = i => { const l = route.legs[i]; return route.legs.length > 1 ? ` (${airportLabel(l.from)} → ${airportLabel(l.to)})` : ""; };
+  const known = cols.filter(c => Math.round(c.ft / 1000) >= c.ground);
+  const unknown = known.filter(c => c.cats[Math.round(c.ft / 1000)] === null).length / Math.max(1, known.length);
+  const span = r => r.b - r.a < 4 ? `around ${fmtDur(r.a)} in` : `${fmtDur(r.a)}–${fmtDur(r.b)} in`;
+  const word = v => `<span class="ov" style="color:${color(GTG_RANK[v])}">${GTG_WORD[v].toLowerCase()}</span>`;
   let html;
   if(!PF.data) html = `<span class="muted">The turbulence forecast isn't available right now. Try again in a few minutes.</span>`;
   else if(unknown > .97) html = `<span class="muted">No turbulence forecast covers this trip: GTG covers the lower 48 US states for the next 9 hours.</span>`;
-  else if(!runs.length) html = `No forecast turbulence on your estimated path at ${fmtFt(PF.cruise)}.`;
-  else html = `Forecast turbulence overlaps your estimated path: ` + runs.slice(0, 4).map(r => `<span class="ov" style="color:${color(GTG_RANK[r.v])}">${GTG_WORD[r.v].toLowerCase()}</span> ${span(r)}${legName(r.leg)}`).join("; ") + (runs.length > 4 ? `; and ${runs.length - 4} more` : "") + ".";
-  if(PF.data && near.length) html += ` <span class="muted">Nearby: ` + near.slice(0, 2).map(r => `${GTG_WORD[r.v].toLowerCase()} ${Math.abs(r.dk) * 1000 === 1000 ? "1,000" : (Math.abs(r.dk) * 1000).toLocaleString()} ft ${r.dk > 0 ? "above" : "below"} ${span(r)}`).join("; ") + ".</span>";
+  else {
+    // moderate-or-worse stretches; ones only a few minutes apart count as one
+    const big = [];
+    for(const r of runs.filter(r => r.v >= 2)){
+      const last = big[big.length - 1];
+      if(last && last.leg === r.leg && r.a - last.b <= 6){ last.b = r.b; last.v = Math.max(last.v, r.v); }
+      else big.push({...r});
+    }
+    const onPath = known.filter(c => Math.round(c.ft / 1000) >= c.ground && c.cats[Math.round(c.ft / 1000)] !== null);
+    const lightShare = onPath.filter(c => c.cats[Math.round(c.ft / 1000)] === 1).length / Math.max(1, onPath.length);
+    const light = lightShare >= .05 ? `light bumps on about ${Math.round(lightShare * 10) * 10 || 5}% of the way` : lightShare > 0 ? "a few light bumps" : "";
+    if(!big.length) html = `No moderate or worse turbulence forecast on your estimated path at ${fmtFt(PF.cruise)}${light ? `, just ${light}` : ""}.`;
+    else {
+      const parts = route.legs.map((leg, i) => {
+        const rs = big.filter(r => r.leg === i);
+        if(!rs.length) return null;
+        // the roughest stretches first, then shown in time order
+        const top = [...rs].sort((x, y) => y.v - x.v || (y.b - y.a) - (x.b - x.a)).slice(0, 2).sort((x, y) => x.a - y.a);
+        const rest = rs.length - top.length;
+        return (route.legs.length > 1 ? `<b>${esc(airportLabel(leg.from))} → ${esc(airportLabel(leg.to))}:</b> ` : "")
+          + top.map(r => `${word(r.v)} ${span(r)}`).join(", ") + (rest ? ` (+${rest} more)` : "");
+      }).filter(Boolean);
+      html = `Forecast turbulence overlaps your estimated path: ${parts.join(". ")}.${light ? ` Also ${light}.` : ""}`;
+    }
+  }
+  if(PF.data && unknown <= .97 && near.length) html += ` <span class="muted">Nearby: ` + near.slice(0, 2).map(r => `${GTG_WORD[r.v].toLowerCase()} ${(Math.abs(r.dk) * 1000).toLocaleString()} ft ${r.dk > 0 ? "above" : "below"} you ${span(r)}`).join("; ") + ".</span>";
   if(PF.data && unknown > .03 && unknown <= .97) html += ` <span class="muted">Part of the trip has no forecast (hatched).</span>`;
+  if(PF.data && Date.now() - Date.parse(PF.data.run) > 5 * 3600e3) html += ` <span class="muted">This forecast is ${Math.round((Date.now() - Date.parse(PF.data.run)) / 3600e3)} hours old.</span>`;
   $("profSum").innerHTML = html;
 }
 
@@ -1632,7 +1664,7 @@ function profileFine(){
   const d = PF.data, dep = new Date(PF.dep);
   const v = d ? `${fmtUTC(new Date(d.hours[0].valid))} to ${fmtUTC(new Date(d.hours[d.hours.length - 1].valid))}` : "";
   $("profFineTxt").innerHTML = `<b>Estimated scenario.</b> Leaving ${esc(localTime(dep))}, flying the most direct path at about 480 mph (35 minutes added per flight), climbing for about ${CLIMB_MIN} minutes, cruising at ${esc(fmtFt(PF.cruise))}, and descending for the last ${DESC_MIN}. Real flights follow airways, change altitude and dodge weather.<br>`
-    + (d ? `<b>Forecast:</b> NOAA Graphical Turbulence Guidance (GTG v4), run ${esc(fmtUTC(new Date(d.run)))}, valid ${esc(v)} UTC. Each spot uses the forecast hour closest to when you'd be there. To keep the file small, the forecast is grouped into boxes about 30 miles wide, each showing the roughest value inside it, so it can look rougher than the full-detail forecast.<br>`
+    + (d ? `<b>Forecast:</b> NOAA Graphical Turbulence Guidance (GTG v4), run ${esc(fmtUTC(new Date(d.run)))}, valid ${esc(v)} UTC. Each spot uses the forecast hour closest to when you'd be there. To keep the file small, the forecast is grouped into boxes about 30 miles wide and 1,000 ft tall; each box shows a value near the roughest 10% of the full-detail forecast inside it, so small rough patches still show up.<br>`
          + `<b>Colors</b> are for an airliner-size plane, from GTG's turbulence strength (EDR): light from 0.15, moderate from 0.22, severe from 0.34, extreme from 0.45. Heights are above sea level; the flight levels pilots use can differ by a few hundred feet. Hatched means no forecast: outside the lower 48 states, or beyond the forecast hours.` : "");
 }
 
@@ -1650,7 +1682,15 @@ async function renderProfile(){
 function openProfile(open){
   $("prof").hidden = !open; $("tlProf").setAttribute("aria-expanded", String(open));
   PF.sel = null; if(!open && PF.marker){ PF.marker.remove(); PF.marker = null; }
-  if(open){ if(isPhone()) openPanel(null); renderProfile(); }
+  if(open){
+    if(isPhone()) openPanel(null);
+    renderProfile().then(() => {
+      if($("prof").hidden || !route) return;
+      const top = isPhone() ? $("head").getBoundingClientRect().bottom + 12 : 20;
+      const bottom = innerHeight - $("prof").getBoundingClientRect().top + 12;
+      if(innerHeight - top - bottom > 60) map.fitBounds(L.latLngBounds(route.legs.flatMap(l => l.pts)), {paddingTopLeft: [isPhone() ? 20 : 370, top], paddingBottomRight: [20, bottom]});
+    });
+  }
 }
 $("tlProf").onclick = () => openProfile($("prof").hidden);
 $("profClose").onclick = () => openProfile(false);
@@ -1681,6 +1721,7 @@ $("profCv").onclick = e => {
   const where = `about ${fmtDur(c.m)} in (${esc(legName)}), when you'd be at ${esc(fmtFt(c.ft))}`;
   $("profNote").innerHTML = v === null
     ? `<b>No forecast</b> here (outside the lower 48 states or beyond the forecast hours), ${where}.`
+    : k < c.ground ? `<b>Ground</b> (the forecast has no values below the terrain here), ${where}.`
     : `<b style="color:${v ? color(GTG_RANK[v]) : "inherit"}">${GTG_WORD[v]}</b> ${v ? "turbulence forecast" : "air forecast"} from ${esc(fmtFt(lo))} to ${hi >= PF.top ? "45,000 ft and up" : esc(fmtFt(hi))}, ${where}. <span class="muted">GTG valid ${esc(fmtUTC(new Date(hr.valid)))}, from the ${esc(fmtUTC(new Date(d.run)))} run.</span>`;
   if(PF.marker) PF.marker.remove();
   PF.marker = L.circleMarker([c.lat, c.lon], {pane: "route", radius: 7, color: "#fff", weight: 3, fillColor: v ? color(GTG_RANK[v]) : "#5fb3ff", fillOpacity: 1, interactive: false}).addTo(map);

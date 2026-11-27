@@ -22,7 +22,8 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # about 2 minutes once an hour when a new turbulence forecast (GTG) comes out, under 1 minute otherwise
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url || steps.deploy1.outputs.page_url }}
@@ -31,6 +32,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+      # numpy + pygrib read NOAA's turbulence forecast (GRIB2) for the flight profile view
+      - run: pip install -q -r requirements.txt || echo "couldn't install the GRIB reader; the flight profile keeps the last forecast"
       - name: Fetch turbulence PIREPs from NOAA AWC
         run: python fetch_pireps.py site/pirep.json
       - uses: actions/configure-pages@v5
