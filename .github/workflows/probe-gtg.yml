@@ -13,5 +13,21 @@ jobs:
         with: {python-version: "3.12"}
       - run: pip install pygrib numpy
       - run: mkdir -p out && time python gtg_profile.py out
-      - uses: actions/upload-artifact@v4
-        with: {name: gtg, path: out/gtg.json}
+      - name: dump sample for screenshots
+        run: |
+          python - <<'PY'
+          import json, gzip, base64
+          d = json.load(open("out/gtg.json"))
+          C = d["codes"]
+          def cat(ch):
+              if ch == ".": return "."
+              e = C.index(ch) * 0.02
+              return "0" if e < .15 else "1" if e < .22 else "2" if e < .34 else "3" if e < .45 else "4"
+          for h in d["hours"][:1]:
+              s = h["edr"]
+              c = "".join(cat(x) for x in s)
+              print("edr gz", len(gzip.compress(s.encode())), "cat gz", len(gzip.compress(c.encode())))
+          b = base64.b64encode(gzip.compress(json.dumps(d).encode(), 9)).decode()
+          print("B64LEN", len(b))
+          for i in range(0, len(b), 4000): print("B64:" + b[i:i+4000])
+          PY
