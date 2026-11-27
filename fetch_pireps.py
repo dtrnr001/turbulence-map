@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Fetch recent turbulence PIREPs, G-AIRMETs and International SIGMETs from
-NOAA AWC and write site/pirep.json, site/gairmet.json and site/isigmet.json.
+NOAA AWC and write site/pirep.json, site/gairmet.json and site/isigmet.json,
+plus winds (winds.json) and NOAA's turbulence forecast for the flight
+profile view (gtg.json, see gtg_profile.py).
 
 Run by the GitHub Actions workflow every few minutes. AWC returns at most
 400 reports per request, so the US area is split into boxes and merged.
@@ -167,6 +169,11 @@ def main(out):
     print(f"wrote {len(reports)} reports to {out} (truncated={truncated}, failed boxes={failures})")
     write_overlays(out.parent)
     write_winds(out.parent)
+    try:
+        from gtg_profile import write_gtg
+        write_gtg(out.parent)
+    except Exception as e:  # never let the forecast hold up the pilot reports
+        print(f"GTG turbulence forecast skipped: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
